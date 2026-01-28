@@ -86,7 +86,7 @@ interface Impedimento {
 
 const eventConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   solicitacao: { label: 'Solicitação', icon: <Play className="h-4 w-4" />, color: 'bg-info' },
-  chegada: { label: 'Chegada', icon: <UserCheck className="h-4 w-4" />, color: 'bg-warning' },
+  chegada: { label: 'Chegada do Operador', icon: <UserCheck className="h-4 w-4" />, color: 'bg-warning' },
   liberacao: { label: 'Liberação', icon: <CheckCircle2 className="h-4 w-4" />, color: 'bg-success' },
   impedimento: { label: 'Impedimento', icon: <XCircle className="h-4 w-4" />, color: 'bg-destructive' },
 };
