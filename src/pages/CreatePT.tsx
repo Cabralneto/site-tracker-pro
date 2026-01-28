@@ -16,9 +16,9 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
-import { format } from 'date-fns';
 import { z } from 'zod';
 import { toast } from 'sonner';
+import { getTodayString } from '@/lib/date-utils';
 
 interface Frente {
   id: string;
@@ -50,7 +50,7 @@ export default function CreatePT() {
   // Form state
   const [numeroPT, setNumeroPT] = useState('');
   const [tipoPT, setTipoPT] = useState<'pt' | 'ptt'>('pt');
-  const [dataServico, setDataServico] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [dataServico, setDataServico] = useState(getTodayString());
   const [frenteId, setFrenteId] = useState('');
   const [disciplinaId, setDisciplinaId] = useState('');
   const [equipe, setEquipe] = useState('');
