@@ -19,7 +19,13 @@ interface DeleteUserRequest {
   userId: string;
 }
 
-type RequestBody = CreateUserRequest | DeleteUserRequest;
+interface UpdatePasswordRequest {
+  action: "update_password";
+  userId: string;
+  newPassword: string;
+}
+
+type RequestBody = CreateUserRequest | DeleteUserRequest | UpdatePasswordRequest;
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -140,6 +146,41 @@ serve(async (req) => {
       if (deleteError) {
         return new Response(
           JSON.stringify({ error: deleteError.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+
+    } else if (body.action === "update_password") {
+      const { userId, newPassword } = body;
+
+      if (!userId || !newPassword) {
+        return new Response(
+          JSON.stringify({ error: "userId and newPassword are required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (newPassword.length < 6) {
+        return new Response(
+          JSON.stringify({ error: "Password must be at least 6 characters" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Update user password
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        userId,
+        { password: newPassword }
+      );
+
+      if (updateError) {
+        return new Response(
+          JSON.stringify({ error: updateError.message }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
