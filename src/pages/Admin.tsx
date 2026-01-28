@@ -56,7 +56,8 @@ import {
   Loader2,
   Shield,
   UserX,
-  UserCheck
+  UserCheck,
+  Key
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -143,6 +144,13 @@ export default function Admin() {
   
   // Delete user state
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+
+  // Change password state
+  const [changePasswordUserId, setChangePasswordUserId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
   useEffect(() => {
     if (isAdmin) {
@@ -328,6 +336,61 @@ export default function Admin() {
       toast.error(error.message || 'Erro ao excluir usuário');
     } finally {
       setDeletingUserId(null);
+    }
+  }
+
+  async function changeUserPassword(userId: string) {
+    if (!newPassword || !confirmPassword) {
+      toast.error('Preencha todos os campos');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('As senhas não coincidem');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'update_password',
+            userId,
+            newPassword,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao alterar senha');
+      }
+
+      toast.success('Senha alterada com sucesso');
+      setPasswordDialogOpen(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      setChangePasswordUserId(null);
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      toast.error(error.message || 'Erro ao alterar senha');
+    } finally {
+      setChangingPassword(false);
     }
   }
 
@@ -827,6 +890,68 @@ export default function Admin() {
                                         </div>
                                       </div>
                                     </div>
+                                  </DialogContent>
+                                </Dialog>
+
+                                {/* Change password button */}
+                                <Dialog 
+                                  open={passwordDialogOpen && changePasswordUserId === u.id} 
+                                  onOpenChange={(open) => {
+                                    setPasswordDialogOpen(open);
+                                    if (!open) {
+                                      setNewPassword('');
+                                      setConfirmPassword('');
+                                      setChangePasswordUserId(null);
+                                    }
+                                  }}
+                                >
+                                  <DialogTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon"
+                                      title="Alterar senha"
+                                      onClick={() => setChangePasswordUserId(u.id)}
+                                    >
+                                      <Key className="h-4 w-4" />
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent>
+                                    <DialogHeader>
+                                      <DialogTitle>Alterar Senha</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                      <div>
+                                        <p className="font-medium">{u.nome}</p>
+                                        <p className="text-sm text-muted-foreground">{u.email}</p>
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label>Nova Senha *</Label>
+                                        <Input 
+                                          type="password"
+                                          value={newPassword}
+                                          onChange={(e) => setNewPassword(e.target.value)}
+                                          placeholder="Mínimo 6 caracteres"
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label>Confirmar Senha *</Label>
+                                        <Input 
+                                          type="password"
+                                          value={confirmPassword}
+                                          onChange={(e) => setConfirmPassword(e.target.value)}
+                                          placeholder="Digite novamente a senha"
+                                        />
+                                      </div>
+                                    </div>
+                                    <DialogFooter>
+                                      <DialogClose asChild>
+                                        <Button variant="outline" disabled={changingPassword}>Cancelar</Button>
+                                      </DialogClose>
+                                      <Button onClick={() => changeUserPassword(u.id)} disabled={changingPassword}>
+                                        {changingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Key className="h-4 w-4 mr-1" />}
+                                        Alterar Senha
+                                      </Button>
+                                    </DialogFooter>
                                   </DialogContent>
                                 </Dialog>
 
