@@ -52,6 +52,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  UserPlus,
   Loader2,
   Shield,
   UserX,
@@ -131,6 +132,17 @@ export default function Admin() {
   // Role management
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
   const [selectedRole, setSelectedRole] = useState<AppRole>('operador');
+
+  // Create user state
+  const [createUserDialogOpen, setCreateUserDialogOpen] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserNome, setNewUserNome] = useState('');
+  const [newUserRole, setNewUserRole] = useState<AppRole>('operador');
+  const [creatingUser, setCreatingUser] = useState(false);
+  
+  // Delete user state
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAdmin) {
@@ -226,6 +238,96 @@ export default function Admin() {
     } catch (error: any) {
       console.error('Error toggling user status:', error);
       toast.error('Erro ao alterar status do usuário');
+    }
+  }
+
+  async function createUser() {
+    if (!newUserEmail || !newUserPassword || !newUserNome) {
+      toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    if (newUserPassword.length < 6) {
+      toast.error('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    setCreatingUser(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'create',
+            email: newUserEmail,
+            password: newUserPassword,
+            nome: newUserNome,
+            role: newUserRole,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao criar usuário');
+      }
+
+      toast.success('Usuário criado com sucesso');
+      setCreateUserDialogOpen(false);
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserNome('');
+      setNewUserRole('operador');
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      toast.error(error.message || 'Erro ao criar usuário');
+    } finally {
+      setCreatingUser(false);
+    }
+  }
+
+  async function deleteUser(userId: string) {
+    setDeletingUserId(userId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'delete',
+            userId,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao excluir usuário');
+      }
+
+      toast.success('Usuário excluído com sucesso');
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast.error(error.message || 'Erro ao excluir usuário');
+    } finally {
+      setDeletingUserId(null);
     }
   }
 
@@ -561,8 +663,72 @@ export default function Admin() {
           {/* USERS TAB */}
           <TabsContent value="users" className="space-y-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Gerenciamento de Usuários</CardTitle>
+                <Dialog open={createUserDialogOpen} onOpenChange={setCreateUserDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <UserPlus className="h-4 w-4 mr-1" />
+                      Novo Usuário
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Cadastrar Novo Usuário</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Nome *</Label>
+                        <Input 
+                          value={newUserNome} 
+                          onChange={(e) => setNewUserNome(e.target.value)}
+                          placeholder="Nome completo"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Email *</Label>
+                        <Input 
+                          type="email"
+                          value={newUserEmail} 
+                          onChange={(e) => setNewUserEmail(e.target.value)}
+                          placeholder="email@exemplo.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Senha *</Label>
+                        <Input 
+                          type="password"
+                          value={newUserPassword} 
+                          onChange={(e) => setNewUserPassword(e.target.value)}
+                          placeholder="Mínimo 6 caracteres"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Permissão Inicial</Label>
+                        <Select value={newUserRole} onValueChange={(v: AppRole) => setNewUserRole(v)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="encarregado">Encarregado</SelectItem>
+                            <SelectItem value="operador">Operador</SelectItem>
+                            <SelectItem value="visualizador">Visualizador</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button variant="outline" disabled={creatingUser}>Cancelar</Button>
+                      </DialogClose>
+                      <Button onClick={createUser} disabled={creatingUser}>
+                        {creatingUser ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserPlus className="h-4 w-4 mr-1" />}
+                        Criar Usuário
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </CardHeader>
               <CardContent>
                 {loadingUsers ? (
@@ -668,9 +834,49 @@ export default function Admin() {
                                   variant="ghost" 
                                   size="icon"
                                   onClick={() => toggleUserActive(u.id, u.ativo)}
+                                  title={u.ativo ? 'Desativar usuário' : 'Ativar usuário'}
                                 >
                                   {u.ativo ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
                                 </Button>
+
+                                {/* Delete user button - only show if not the current user */}
+                                {u.id !== user?.id && (
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        title="Excluir usuário"
+                                        disabled={deletingUserId === u.id}
+                                      >
+                                        {deletingUserId === u.id ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        )}
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Excluir Usuário</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Tem certeza que deseja excluir o usuário <strong>{u.nome}</strong> ({u.email})?
+                                          <br /><br />
+                                          Esta ação é irreversível e todos os dados associados serão perdidos.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction 
+                                          onClick={() => deleteUser(u.id)}
+                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        >
+                                          Excluir
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
