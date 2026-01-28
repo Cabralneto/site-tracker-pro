@@ -25,6 +25,8 @@ interface AuthContextType {
   isEncarregado: boolean;
   isOperador: boolean;
   isVisualizador: boolean;
+  canActAsEncarregado: boolean;
+  canActAsOperador: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -127,9 +129,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasRole = (role: AppRole) => roles.includes(role);
   const isAdmin = hasRole('admin');
-  const isEncarregado = hasRole('encarregado') || isAdmin;
-  const isOperador = hasRole('operador') || isAdmin;
-  const isVisualizador = hasRole('visualizador') || isAdmin;
+  // Papéis exatos - não incluem admin para separar responsabilidades
+  const isEncarregado = hasRole('encarregado');
+  const isOperador = hasRole('operador');
+  const isVisualizador = hasRole('visualizador');
+  // Helpers que incluem admin para permissões de visualização
+  const canActAsEncarregado = isEncarregado || isAdmin;
+  const canActAsOperador = isOperador || isAdmin;
 
   return (
     <AuthContext.Provider value={{
@@ -145,7 +151,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAdmin,
       isEncarregado,
       isOperador,
-      isVisualizador
+      isVisualizador,
+      canActAsEncarregado,
+      canActAsOperador
     }}>
       {children}
     </AuthContext.Provider>
