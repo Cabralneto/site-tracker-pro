@@ -41,7 +41,7 @@ const ptSchema = z.object({
 
 export default function CreatePT() {
   const navigate = useNavigate();
-  const { user, isEncarregado } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [frentes, setFrentes] = useState<Frente[]>([]);
@@ -125,13 +125,13 @@ export default function CreatePT() {
     }
   }
 
-  if (!isEncarregado) {
+  if (!isAdmin) {
     return (
       <AppLayout>
         <div className="px-4 py-6">
           <Alert variant="destructive">
             <AlertDescription>
-              Você não tem permissão para criar PTs. Apenas encarregados e administradores podem criar.
+              Você não tem permissão para criar PTs. Apenas administradores podem criar.
             </AlertDescription>
           </Alert>
         </div>
