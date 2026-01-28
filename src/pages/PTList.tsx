@@ -111,7 +111,7 @@ export default function PTList() {
         query = query.eq('disciplina_id', disciplinaFilter);
       }
 
-      if (responsavelFilter !== 'all') {
+      if (isAdmin && responsavelFilter !== 'all') {
         query = query.eq('responsavel_atraso', responsavelFilter as 'etm' | 'petrobras' | 'sem_atraso' | 'impedimento');
       }
 
@@ -214,18 +214,21 @@ export default function PTList() {
                   </SelectContent>
                 </Select>
 
-                <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Responsável" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="etm">Atraso ETM</SelectItem>
-                    <SelectItem value="petrobras">Atraso Petrobras</SelectItem>
-                    <SelectItem value="sem_atraso">No prazo</SelectItem>
-                    <SelectItem value="impedimento">Impedida</SelectItem>
-                  </SelectContent>
-                </Select>
+                {/* Filtro de atraso é informação restrita ao Admin */}
+                {isAdmin && (
+                  <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Responsável" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="etm">Atraso ETM</SelectItem>
+                      <SelectItem value="petrobras">Atraso Petrobras</SelectItem>
+                      <SelectItem value="sem_atraso">No prazo</SelectItem>
+                      <SelectItem value="impedimento">Impedida</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
 
                 <Select value={frenteFilter} onValueChange={setFrenteFilter}>
                   <SelectTrigger>
@@ -264,7 +267,7 @@ export default function PTList() {
                 <X className="h-3 w-3 cursor-pointer" onClick={() => setStatusFilter('all')} />
               </Badge>
             )}
-            {responsavelFilter !== 'all' && (
+            {isAdmin && responsavelFilter !== 'all' && (
               <Badge variant="secondary" className="gap-1">
                 Resp: {responsavelFilter}
                 <X className="h-3 w-3 cursor-pointer" onClick={() => setResponsavelFilter('all')} />

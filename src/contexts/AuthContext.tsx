@@ -74,6 +74,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function fetchUserData(userId: string) {
     try {
+      // Evita estado antigo (ex.: usuário anterior) durante transição de sessão
+      setRoles([]);
+
       // Fetch profile
       const { data: profileData } = await supabase
         .from('profiles')
@@ -92,7 +95,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('user_id', userId);
       
       if (rolesData) {
-        setRoles(rolesData.map(r => r.role as AppRole));
+        const nextRoles = rolesData.map(r => r.role as AppRole);
+        setRoles(nextRoles);
+
+        if (import.meta.env.DEV) {
+          console.debug('[AuthContext] roles carregadas', {
+            userId,
+            email: profileData?.email,
+            roles: nextRoles,
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 export type PTStatus = 'pendente' | 'solicitada' | 'chegada' | 'liberada' | 'impedida';
 export type ResponsavelAtraso = 'etm' | 'petrobras' | 'sem_atraso' | 'impedimento';
@@ -43,6 +44,9 @@ const delayConfig: Record<string, { label: string; className: string }> = {
 };
 
 export function DelayBadge({ responsavel, className }: DelayBadgeProps) {
+  const { isAdmin } = useAuth();
+  // Atraso (ETM/Petrobras) é informação restrita ao Admin
+  if (!isAdmin) return null;
   if (!responsavel) return null;
   
   const config = delayConfig[responsavel] || delayConfig.sem_atraso;
