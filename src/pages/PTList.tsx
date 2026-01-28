@@ -210,7 +210,7 @@ export default function PTList() {
                     <SelectItem value="all">Todos os status</SelectItem>
                     <SelectItem value="pendente">Pendente</SelectItem>
                     <SelectItem value="solicitada">Solicitada</SelectItem>
-                    <SelectItem value="chegada">Chegada</SelectItem>
+                    <SelectItem value="chegada">Chegada do Operador</SelectItem>
                     <SelectItem value="liberada">Liberada</SelectItem>
                     <SelectItem value="impedida">Impedida</SelectItem>
                   </SelectContent>

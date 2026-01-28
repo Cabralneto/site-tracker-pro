@@ -12,7 +12,7 @@ interface StatusBadgeProps {
 const statusConfig: Record<string, { label: string; className: string }> = {
   pendente: { label: 'Pendente', className: 'badge-pendente' },
   solicitada: { label: 'Solicitada', className: 'badge-solicitada' },
-  chegada: { label: 'Chegada', className: 'badge-chegada' },
+  chegada: { label: 'Chegada do Operador', className: 'badge-chegada' },
   liberada: { label: 'Liberada', className: 'badge-liberada' },
   impedida: { label: 'Impedida', className: 'badge-impedida' },
 };
