@@ -17,6 +17,7 @@ import {
 import { Search, Filter, Plus, Loader2, Calendar, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getTodayString, formatDateBR } from '@/lib/date-utils';
 
 interface PT {
   id: string;
@@ -52,7 +53,7 @@ export default function PTList() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [dateFilter, setDateFilter] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [dateFilter, setDateFilter] = useState(getTodayString());
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
   const [frenteFilter, setFrenteFilter] = useState('all');
   const [disciplinaFilter, setDisciplinaFilter] = useState('all');

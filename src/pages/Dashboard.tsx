@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getTodayString } from '@/lib/date-utils';
 
 interface PTSummary {
   total: number;
@@ -65,7 +66,7 @@ export default function Dashboard() {
   async function fetchDashboardData() {
     setLoading(true);
     try {
-      const today = format(new Date(), 'yyyy-MM-dd');
+      const today = getTodayString();
       
       // Fetch today's PTs with related data
       const { data: pts, error } = await supabase

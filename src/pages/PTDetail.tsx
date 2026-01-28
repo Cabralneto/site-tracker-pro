@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatDateBR } from '@/lib/date-utils';
 import { toast } from 'sonner';
 import QRCode from 'qrcode';
 
@@ -393,7 +394,7 @@ export default function PTDetail() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                <span>{format(new Date(pt.data_servico), "dd/MM/yyyy")}</span>
+                <span>{formatDateBR(pt.data_servico)}</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Clock className="h-4 w-4" />
