@@ -6,8 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 const navItems = [
   { href: '/', icon: Home, label: 'Início' },
   { href: '/pts', icon: ClipboardList, label: 'PTs' },
-  { href: '/nova-pt', icon: Plus, label: 'Nova PT', highlight: true },
-  { href: '/relatorios', icon: BarChart3, label: 'Relatórios' },
+  { href: '/nova-pt', icon: Plus, label: 'Nova PT', highlight: true, adminOnly: true },
+  { href: '/relatorios', icon: BarChart3, label: 'Relatórios', adminOnly: true },
   { href: '/admin', icon: Settings, label: 'Admin', adminOnly: true },
 ];
 
