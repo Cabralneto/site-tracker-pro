@@ -12,6 +12,8 @@ import Dashboard from "./pages/Dashboard";
 import PTList from "./pages/PTList";
 import CreatePT from "./pages/CreatePT";
 import PTDetail from "./pages/PTDetail";
+import Reports from "./pages/Reports";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +45,16 @@ const App = () => (
             <Route path="/pt/:id" element={
               <ProtectedRoute>
                 <PTDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/relatorios" element={
+              <ProtectedRoute>
+                <Reports />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin" element={
+              <ProtectedRoute requireAdmin>
+                <Admin />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
