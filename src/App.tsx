@@ -38,7 +38,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/nova-pt" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <CreatePT />
               </ProtectedRoute>
             } />
