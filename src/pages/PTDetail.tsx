@@ -93,7 +93,7 @@ const eventConfig: Record<string, { label: string; icon: React.ReactNode; color:
 export default function PTDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isEncarregado, isOperador } = useAuth();
+  const { user, isEncarregado, isOperador, canActAsEncarregado, canActAsOperador } = useAuth();
   const { getLocation, loading: geoLoading } = useGeolocation();
   
   const [loading, setLoading] = useState(true);
@@ -323,9 +323,13 @@ export default function PTDetail() {
   }
 
   const hasEvent = (tipo: string) => eventos.some(e => e.tipo_evento === tipo);
+  // Encarregado: solicita liberação em PTs pendentes
   const canSolicitar = isEncarregado && pt?.status === 'pendente' && !hasEvent('solicitacao');
-  const canChegada = (isOperador || isEncarregado) && hasEvent('solicitacao') && !hasEvent('chegada');
+  // Encarregado ou Operador: registra chegada (encarregado registra como pendente de confirmação)
+  const canChegada = (canActAsOperador || isEncarregado) && hasEvent('solicitacao') && !hasEvent('chegada');
+  // Apenas Operador: libera a PT
   const canLiberar = isOperador && hasEvent('chegada') && !hasEvent('liberacao') && !hasEvent('impedimento');
+  // Apenas Operador: registra impedimento
   const canImpedir = isOperador && hasEvent('solicitacao') && !hasEvent('liberacao') && !hasEvent('impedimento');
 
   if (loading) {
