@@ -45,7 +45,7 @@ interface RecentPT {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { profile, roles } = useAuth();
+  const { profile, roles, isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<PTSummary>({
     total: 0,
@@ -167,20 +167,25 @@ export default function Dashboard() {
             variant="default"
             onClick={() => navigate('/pts?status=pendente')}
           />
-          <StatsCard
-            title="Atraso ETM"
-            value={stats.atrasosETM}
-            icon={<AlertTriangle className="h-5 w-5" />}
-            variant="warning"
-            onClick={() => navigate('/pts?responsavel=etm')}
-          />
-          <StatsCard
-            title="Atraso Petrobras"
-            value={stats.atrasosPetrobras}
-            icon={<AlertTriangle className="h-5 w-5" />}
-            variant="danger"
-            onClick={() => navigate('/pts?responsavel=petrobras')}
-          />
+          {/* Cards de atraso só visíveis para Admin */}
+          {isAdmin && (
+            <>
+              <StatsCard
+                title="Atraso ETM"
+                value={stats.atrasosETM}
+                icon={<AlertTriangle className="h-5 w-5" />}
+                variant="warning"
+                onClick={() => navigate('/pts?responsavel=etm')}
+              />
+              <StatsCard
+                title="Atraso Petrobras"
+                value={stats.atrasosPetrobras}
+                icon={<AlertTriangle className="h-5 w-5" />}
+                variant="danger"
+                onClick={() => navigate('/pts?responsavel=petrobras')}
+              />
+            </>
+          )}
           <StatsCard
             title="Liberadas"
             value={stats.liberadas}
@@ -241,7 +246,7 @@ export default function Dashboard() {
                     <div className="flex flex-col items-end gap-1">
                       <StatusBadge status={pt.status} />
                       {/* DelayBadge só visível para Admin */}
-                      {roles.includes('admin') && pt.responsavel_atraso && (
+                      {isAdmin && pt.responsavel_atraso && (
                         <DelayBadge responsavel={pt.responsavel_atraso} />
                       )}
                     </div>
