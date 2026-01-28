@@ -39,6 +39,11 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+interface EventoInfo {
+  tipo_evento: string;
+  criado_em: string;
+}
+
 interface PTReport {
   id: string;
   numero_pt: string;
@@ -50,6 +55,9 @@ interface PTReport {
   criado_em: string;
   frentes: { nome: string } | null;
   disciplinas: { nome: string } | null;
+  hora_solicitacao?: string | null;
+  hora_chegada?: string | null;
+  hora_liberacao?: string | null;
 }
 
 interface Frente {
@@ -158,8 +166,30 @@ export default function Reports() {
 
       if (error) throw error;
 
-      if (data) {
-        setPTs(data as PTReport[]);
+      if (data && data.length > 0) {
+        // Fetch events for all PTs
+        const ptIds = data.map(p => p.id);
+        const { data: eventos } = await supabase
+          .from('eventos')
+          .select('pt_id, tipo_evento, criado_em')
+          .in('pt_id', ptIds);
+
+        // Map events to PTs
+        const ptsWithEvents: PTReport[] = data.map(pt => {
+          const ptEventos = eventos?.filter(e => e.pt_id === pt.id) || [];
+          const solicitacao = ptEventos.find(e => e.tipo_evento === 'solicitacao');
+          const chegada = ptEventos.find(e => e.tipo_evento === 'chegada');
+          const liberacao = ptEventos.find(e => e.tipo_evento === 'liberacao');
+
+          return {
+            ...pt,
+            hora_solicitacao: solicitacao?.criado_em || null,
+            hora_chegada: chegada?.criado_em || null,
+            hora_liberacao: liberacao?.criado_em || null,
+          } as PTReport;
+        });
+
+        setPTs(ptsWithEvents);
         
         // Calculate stats
         const liberadas = data.filter(p => p.status === 'liberada').length;
@@ -173,13 +203,32 @@ export default function Reports() {
           impedidas,
           atrasosETM,
           atrasosPetrobras,
-          tempoMedioLiberacao: '-', // TODO: Calculate from tempo_ate_liberacao
+          tempoMedioLiberacao: '-',
+        });
+      } else {
+        setPTs([]);
+        setStats({
+          total: 0,
+          liberadas: 0,
+          impedidas: 0,
+          atrasosETM: 0,
+          atrasosPetrobras: 0,
+          tempoMedioLiberacao: '-',
         });
       }
     } catch (error) {
       console.error('Error fetching report data:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function formatEventTime(dateStr: string | null | undefined): string {
+    if (!dateStr) return '-';
+    try {
+      return format(parseISO(dateStr), 'HH:mm');
+    } catch {
+      return '-';
     }
   }
 
@@ -191,9 +240,11 @@ export default function Reports() {
       'Frente': pt.frentes?.nome || '-',
       'Disciplina': pt.disciplinas?.nome || '-',
       'Equipe': pt.equipe || '-',
+      'Hora Solicitação': formatEventTime(pt.hora_solicitacao),
+      'Hora Chegada': formatEventTime(pt.hora_chegada),
+      'Hora Liberação': formatEventTime(pt.hora_liberacao),
       'Status': pt.status,
       'Responsável Atraso': pt.responsavel_atraso || 'Sem atraso',
-      'Criado em': format(parseISO(pt.criado_em), 'dd/MM/yyyy HH:mm'),
     }));
   }
 
@@ -242,16 +293,18 @@ export default function Reports() {
         pt.tipo_pt.toUpperCase(),
         format(parseISO(pt.data_servico), 'dd/MM/yyyy'),
         pt.frentes?.nome || '-',
-        pt.disciplinas?.nome || '-',
+        formatEventTime(pt.hora_solicitacao),
+        formatEventTime(pt.hora_chegada),
+        formatEventTime(pt.hora_liberacao),
         pt.status,
         pt.responsavel_atraso || '-',
       ]);
 
       autoTable(doc, {
-        head: [['Número', 'Tipo', 'Data', 'Frente', 'Disciplina', 'Status', 'Resp. Atraso']],
+        head: [['Número', 'Tipo', 'Data', 'Frente', 'Solicit.', 'Chegada', 'Liberação', 'Status', 'Resp.']],
         body: tableData,
         startY: 42,
-        styles: { fontSize: 8 },
+        styles: { fontSize: 7 },
         headStyles: { fillColor: [30, 64, 175] },
       });
 
@@ -472,7 +525,9 @@ export default function Reports() {
                       <TableHead>Número</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Frente</TableHead>
-                      <TableHead>Disciplina</TableHead>
+                      <TableHead className="text-center">Solicitação</TableHead>
+                      <TableHead className="text-center">Chegada</TableHead>
+                      <TableHead className="text-center">Liberação</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Resp. Atraso</TableHead>
                     </TableRow>
@@ -490,7 +545,15 @@ export default function Reports() {
                           {format(parseISO(pt.data_servico), 'dd/MM/yyyy')}
                         </TableCell>
                         <TableCell>{pt.frentes?.nome || '-'}</TableCell>
-                        <TableCell>{pt.disciplinas?.nome || '-'}</TableCell>
+                        <TableCell className="text-center font-mono text-sm">
+                          {formatEventTime(pt.hora_solicitacao)}
+                        </TableCell>
+                        <TableCell className="text-center font-mono text-sm">
+                          {formatEventTime(pt.hora_chegada)}
+                        </TableCell>
+                        <TableCell className="text-center font-mono text-sm">
+                          {formatEventTime(pt.hora_liberacao)}
+                        </TableCell>
                         <TableCell>
                           <StatusBadge status={pt.status} />
                         </TableCell>
