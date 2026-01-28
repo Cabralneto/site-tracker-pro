@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { StatusBadge, DelayBadge } from '@/components/pt/StatusBadge';
 import { Input } from '@/components/ui/input';
@@ -44,6 +45,7 @@ interface Disciplina {
 
 export default function PTList() {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [pts, setPTs] = useState<PT[]>([]);
@@ -321,7 +323,8 @@ export default function PTList() {
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
                       <StatusBadge status={pt.status} />
-                      {pt.responsavel_atraso && (
+                      {/* DelayBadge só visível para Admin */}
+                      {isAdmin && pt.responsavel_atraso && (
                         <DelayBadge responsavel={pt.responsavel_atraso} />
                       )}
                     </div>

@@ -94,7 +94,7 @@ const eventConfig: Record<string, { label: string; icon: React.ReactNode; color:
 export default function PTDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isEncarregado, isOperador, canActAsEncarregado, canActAsOperador } = useAuth();
+  const { user, isAdmin, isEncarregado, isOperador, canActAsEncarregado, canActAsOperador } = useAuth();
   const { getLocation, loading: geoLoading } = useGeolocation();
   
   const [loading, setLoading] = useState(true);
@@ -324,14 +324,24 @@ export default function PTDetail() {
   }
 
   const hasEvent = (tipo: string) => eventos.some(e => e.tipo_evento === tipo);
+  
+  // Fluxo correto:
+  // 1. Admin cria PT (pendente)
+  // 2. Encarregado solicita liberação (solicitada) 
+  // 3. Encarregado registra chegada (chegada)
+  // 4. Operador libera OU registra impedimento (liberada/impedida)
+  
   // Encarregado: solicita liberação em PTs pendentes
   const canSolicitar = isEncarregado && pt?.status === 'pendente' && !hasEvent('solicitacao');
-  // Encarregado ou Operador: registra chegada (encarregado registra como pendente de confirmação)
-  const canChegada = (canActAsOperador || isEncarregado) && hasEvent('solicitacao') && !hasEvent('chegada');
-  // Apenas Operador: libera a PT
+  
+  // Apenas Encarregado: registra chegada do operador (após solicitar)
+  const canChegada = isEncarregado && hasEvent('solicitacao') && !hasEvent('chegada');
+  
+  // Apenas Operador: libera a PT (somente após Encarregado confirmar chegada)
   const canLiberar = isOperador && hasEvent('chegada') && !hasEvent('liberacao') && !hasEvent('impedimento');
-  // Apenas Operador: registra impedimento
-  const canImpedir = isOperador && hasEvent('solicitacao') && !hasEvent('liberacao') && !hasEvent('impedimento');
+  
+  // Apenas Operador: registra impedimento (somente após Encarregado confirmar chegada)
+  const canImpedir = isOperador && hasEvent('chegada') && !hasEvent('liberacao') && !hasEvent('impedimento');
 
   if (loading) {
     return (
@@ -389,7 +399,8 @@ export default function PTDetail() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
               <StatusBadge status={pt.status} />
-              {pt.responsavel_atraso && <DelayBadge responsavel={pt.responsavel_atraso} />}
+              {/* DelayBadge só visível para Admin */}
+              {isAdmin && pt.responsavel_atraso && <DelayBadge responsavel={pt.responsavel_atraso} />}
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
