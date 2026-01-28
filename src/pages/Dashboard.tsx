@@ -142,14 +142,16 @@ export default function Dashboard() {
           <p className="text-muted-foreground">{getRoleLabel()} • {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}</p>
         </div>
 
-        {/* Quick action */}
-        <Button 
-          onClick={() => navigate('/nova-pt')}
-          className="w-full h-14 text-lg font-semibold gradient-primary"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Nova PT
-        </Button>
+        {/* Quick action - apenas Admin */}
+        {isAdmin && (
+          <Button 
+            onClick={() => navigate('/nova-pt')}
+            className="w-full h-14 text-lg font-semibold gradient-primary"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Nova PT
+          </Button>
+        )}
 
         {/* Stats grid */}
         <div className="grid grid-cols-2 gap-3">
@@ -218,13 +220,15 @@ export default function Dashboard() {
               <div className="text-center py-8 text-muted-foreground">
                 <ClipboardList className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p>Nenhuma PT cadastrada hoje</p>
-                <Button 
-                  variant="outline" 
-                  className="mt-4"
-                  onClick={() => navigate('/nova-pt')}
-                >
-                  Criar primeira PT
-                </Button>
+                {isAdmin && (
+                  <Button 
+                    variant="outline" 
+                    className="mt-4"
+                    onClick={() => navigate('/nova-pt')}
+                  >
+                    Criar primeira PT
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
