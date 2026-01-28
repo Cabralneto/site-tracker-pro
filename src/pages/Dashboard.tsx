@@ -240,7 +240,8 @@ export default function Dashboard() {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <StatusBadge status={pt.status} />
-                      {pt.responsavel_atraso && (
+                      {/* DelayBadge só visível para Admin */}
+                      {roles.includes('admin') && pt.responsavel_atraso && (
                         <DelayBadge responsavel={pt.responsavel_atraso} />
                       )}
                     </div>
