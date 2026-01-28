@@ -148,10 +148,12 @@ export default function PTList() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Permissões de Trabalho</h1>
-          <Button onClick={() => navigate('/nova-pt')} size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            Nova
-          </Button>
+          {isAdmin && (
+            <Button onClick={() => navigate('/nova-pt')} size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              Nova
+            </Button>
+          )}
         </div>
 
         {/* Date selector */}
@@ -284,13 +286,15 @@ export default function PTList() {
         ) : filteredPTs.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <p>Nenhuma PT encontrada</p>
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={() => navigate('/nova-pt')}
-            >
-              Criar nova PT
-            </Button>
+            {isAdmin && (
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => navigate('/nova-pt')}
+              >
+                Criar nova PT
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
