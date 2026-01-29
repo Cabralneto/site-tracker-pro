@@ -28,6 +28,9 @@ interface PT {
   status: string;
   responsavel_atraso: string | null;
   equipe: string | null;
+  encarregado_nome: string | null;
+  encarregado_matricula: string | null;
+  efetivo_qtd: number;
   criado_em: string;
   frentes?: { id: string; nome: string } | null;
   disciplinas?: { id: string; nome: string } | null;
@@ -92,6 +95,9 @@ export default function PTList() {
           status,
           responsavel_atraso,
           equipe,
+          encarregado_nome,
+          encarregado_matricula,
+          efetivo_qtd,
           criado_em,
           frentes (id, nome),
           disciplinas (id, nome)
@@ -128,7 +134,9 @@ export default function PTList() {
 
   const filteredPTs = pts.filter(pt => 
     pt.numero_pt.toLowerCase().includes(search.toLowerCase()) ||
-    pt.equipe?.toLowerCase().includes(search.toLowerCase())
+    pt.equipe?.toLowerCase().includes(search.toLowerCase()) ||
+    pt.encarregado_nome?.toLowerCase().includes(search.toLowerCase()) ||
+    pt.encarregado_matricula?.toLowerCase().includes(search.toLowerCase())
   );
 
   const clearFilters = () => {
@@ -172,7 +180,7 @@ export default function PTList() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por número ou equipe..."
+              placeholder="Buscar por número ou encarregado..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -319,9 +327,9 @@ export default function PTList() {
                       <p className="text-sm text-muted-foreground">
                         {pt.frentes?.nome || 'Sem frente'} • {pt.disciplinas?.nome || 'Sem disciplina'}
                       </p>
-                      {pt.equipe && (
+                      {pt.encarregado_nome && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          Equipe: {pt.equipe}
+                          Enc: {pt.encarregado_nome} {pt.efetivo_qtd ? `• ${pt.efetivo_qtd} pessoas` : ''}
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground mt-1">

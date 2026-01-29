@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
@@ -36,7 +37,10 @@ const ptSchema = z.object({
   data_servico: z.string().min(1, 'Data é obrigatória'),
   frente_id: z.string().min(1, 'Frente é obrigatória'),
   disciplina_id: z.string().min(1, 'Disciplina é obrigatória'),
-  equipe: z.string().max(200).optional(),
+  encarregado_nome: z.string().min(1, 'Nome do Encarregado é obrigatório').max(200),
+  encarregado_matricula: z.string().min(1, 'Matrícula do Encarregado é obrigatória').max(50),
+  efetivo_qtd: z.number().int().min(1, 'Quantidade de efetivo deve ser no mínimo 1'),
+  descricao_operacao: z.string().min(1, 'Descrição da Operação é obrigatória').max(2000),
 });
 
 export default function CreatePT() {
@@ -53,7 +57,10 @@ export default function CreatePT() {
   const [dataServico, setDataServico] = useState(getTodayString());
   const [frenteId, setFrenteId] = useState('');
   const [disciplinaId, setDisciplinaId] = useState('');
-  const [equipe, setEquipe] = useState('');
+  const [encarregadoNome, setEncarregadoNome] = useState('');
+  const [encarregadoMatricula, setEncarregadoMatricula] = useState('');
+  const [efetivoQtd, setEfetivoQtd] = useState<number>(1);
+  const [descricaoOperacao, setDescricaoOperacao] = useState('');
 
   useEffect(() => {
     fetchSelectData();
@@ -82,7 +89,10 @@ export default function CreatePT() {
         data_servico: dataServico,
         frente_id: frenteId,
         disciplina_id: disciplinaId,
-        equipe: equipe || undefined,
+        encarregado_nome: encarregadoNome,
+        encarregado_matricula: encarregadoMatricula,
+        efetivo_qtd: efetivoQtd,
+        descricao_operacao: descricaoOperacao,
       });
 
       if (!validation.success) {
@@ -106,7 +116,10 @@ export default function CreatePT() {
           data_servico: dataServico,
           frente_id: frenteId,
           disciplina_id: disciplinaId,
-          equipe: equipe || null,
+          encarregado_nome: encarregadoNome,
+          encarregado_matricula: encarregadoMatricula,
+          efetivo_qtd: efetivoQtd,
+          descricao_operacao: descricaoOperacao,
           criado_por: user.id,
           status: 'pendente',
         })
@@ -232,14 +245,64 @@ export default function CreatePT() {
                 </Select>
               </div>
 
+              {/* Encarregado Section */}
+              <div className="border-t pt-4 mt-4">
+                <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Encarregado</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="encarregado_nome">Nome *</Label>
+                    <Input
+                      id="encarregado_nome"
+                      placeholder="Nome do encarregado"
+                      value={encarregadoNome}
+                      onChange={(e) => setEncarregadoNome(e.target.value)}
+                      required
+                      className="h-12"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="encarregado_matricula">Matrícula *</Label>
+                    <Input
+                      id="encarregado_matricula"
+                      placeholder="Matrícula"
+                      value={encarregadoMatricula}
+                      onChange={(e) => setEncarregadoMatricula(e.target.value)}
+                      required
+                      className="h-12"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Efetivo */}
               <div className="space-y-2">
-                <Label htmlFor="equipe">Equipe (opcional)</Label>
+                <Label htmlFor="efetivo">Qtd. Efetivo *</Label>
                 <Input
-                  id="equipe"
-                  placeholder="Nome ou identificação da equipe"
-                  value={equipe}
-                  onChange={(e) => setEquipe(e.target.value)}
+                  id="efetivo"
+                  type="number"
+                  min={1}
+                  placeholder="Quantidade de pessoas"
+                  value={efetivoQtd}
+                  onChange={(e) => setEfetivoQtd(parseInt(e.target.value) || 1)}
+                  required
                   className="h-12"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Número de pessoas que farão parte da operação
+                </p>
+              </div>
+
+              {/* Descrição da Operação */}
+              <div className="space-y-2">
+                <Label htmlFor="descricao">Descrição da Operação *</Label>
+                <Textarea
+                  id="descricao"
+                  placeholder="Descreva a operação a ser realizada..."
+                  value={descricaoOperacao}
+                  onChange={(e) => setDescricaoOperacao(e.target.value)}
+                  required
+                  rows={4}
+                  className="resize-none"
                 />
               </div>
 

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -37,8 +38,11 @@ import {
   User,
   Calendar,
   QrCode,
+  Users,
+  FileText,
+  AlertTriangle,
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatDateBR } from '@/lib/date-utils';
 import { toast } from 'sonner';
@@ -56,6 +60,13 @@ interface PT {
   equipe: string | null;
   criado_em: string;
   criado_por: string;
+  efetivo_qtd: number;
+  encarregado_nome: string | null;
+  encarregado_matricula: string | null;
+  descricao_operacao: string | null;
+  causa_atraso: string | null;
+  atraso_etm: number;
+  atraso_petrobras: number;
   frentes?: { id: string; nome: string } | null;
   disciplinas?: { id: string; nome: string } | null;
   profiles?: { nome: string } | null;
@@ -109,6 +120,10 @@ export default function PTDetail() {
   const [detalheImpedimento, setDetalheImpedimento] = useState('');
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+  
+  // Causa atraso dialog
+  const [showCausaAtrasoDialog, setShowCausaAtrasoDialog] = useState(false);
+  const [causaAtraso, setCausaAtraso] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -148,6 +163,9 @@ export default function PTDetail() {
       setPT({
         ...ptData,
         profiles: creatorProfile,
+        efetivo_qtd: ptData.efetivo_qtd || 1,
+        atraso_etm: Number(ptData.atraso_etm) || 0,
+        atraso_petrobras: Number(ptData.atraso_petrobras) || 0,
       } as unknown as PT);
 
       // Fetch events
@@ -193,6 +211,54 @@ export default function PTDetail() {
     if (data) setImpedimentos(data);
   }
 
+  // Calculate delays based on events and SLA
+  function calcularAtrasos(): { atrasoETM: number; atrasoPetrobras: number } {
+    const solicitacao = eventos.find(e => e.tipo_evento === 'solicitacao');
+    const liberacao = eventos.find(e => e.tipo_evento === 'liberacao');
+    
+    if (!solicitacao) return { atrasoETM: 0, atrasoPetrobras: 0 };
+
+    const horaLimiteSolicitacao = '07:30:00';
+    const horaLimiteLiberacao = '08:15:00';
+    
+    const horaSolicitacao = format(new Date(solicitacao.criado_em), 'HH:mm:ss');
+    
+    let atrasoETM = 0;
+    let atrasoPetrobras = 0;
+    
+    // Atraso ETM: solicitação após 07:30
+    if (horaSolicitacao > horaLimiteSolicitacao) {
+      const [h, m] = horaSolicitacao.split(':').map(Number);
+      const [lh, lm] = horaLimiteSolicitacao.split(':').map(Number);
+      atrasoETM = (h * 60 + m) - (lh * 60 + lm);
+    }
+    
+    // Atraso Petrobras: liberação após 08:15 (quando solicitação foi no prazo)
+    if (liberacao) {
+      const horaLiberacao = format(new Date(liberacao.criado_em), 'HH:mm:ss');
+      if (horaSolicitacao <= horaLimiteSolicitacao && horaLiberacao > horaLimiteLiberacao) {
+        const [h, m] = horaLiberacao.split(':').map(Number);
+        const [lh, lm] = horaLimiteLiberacao.split(':').map(Number);
+        atrasoPetrobras = (h * 60 + m) - (lh * 60 + lm);
+      }
+    }
+    
+    return { atrasoETM, atrasoPetrobras };
+  }
+
+  // Calculate HH Improdutivo
+  function calcularHHImprodutivo(): number {
+    if (!pt) return 0;
+    const atrasoTotal = (pt.atraso_etm || 0) + (pt.atraso_petrobras || 0);
+    return (pt.efetivo_qtd || 1) * atrasoTotal;
+  }
+
+  // Check if has delay (needs causa_atraso)
+  function hasAtraso(): boolean {
+    if (!pt) return false;
+    return ((pt.atraso_etm || 0) + (pt.atraso_petrobras || 0)) > 0;
+  }
+
   async function registrarEvento(tipo: 'solicitacao' | 'chegada' | 'liberacao' | 'impedimento', options?: {
     impedimentoId?: string;
     detalheImpedimento?: string;
@@ -215,7 +281,7 @@ export default function PTDetail() {
           lat: location?.lat || null,
           lon: location?.lon || null,
           accuracy: location?.accuracy || null,
-          ip: null, // Would need edge function to capture
+          ip: null,
           user_agent: navigator.userAgent,
           confirmacao_status: options?.pendente ? 'pendente' : 'confirmado',
           impedimento_id: options?.impedimentoId || null,
@@ -227,6 +293,8 @@ export default function PTDetail() {
       // Update PT status
       let newStatus: string = pt.status;
       let responsavelAtraso: string | null = pt.responsavel_atraso;
+      let atrasoETM = 0;
+      let atrasoPetrobras = 0;
 
       switch (tipo) {
         case 'solicitacao':
@@ -237,8 +305,18 @@ export default function PTDetail() {
           break;
         case 'liberacao':
           newStatus = 'liberada';
-          // Calculate delay responsibility
-          responsavelAtraso = await calcularResponsavel();
+          // Calculate delays
+          const delays = calcularAtrasos();
+          atrasoETM = delays.atrasoETM;
+          atrasoPetrobras = delays.atrasoPetrobras;
+          
+          if (atrasoETM > 0) {
+            responsavelAtraso = 'etm';
+          } else if (atrasoPetrobras > 0) {
+            responsavelAtraso = 'petrobras';
+          } else {
+            responsavelAtraso = 'sem_atraso';
+          }
           break;
         case 'impedimento':
           newStatus = 'impedida';
@@ -246,12 +324,19 @@ export default function PTDetail() {
           break;
       }
 
+      const updateData: any = { 
+        status: newStatus as 'pendente' | 'solicitada' | 'chegada' | 'liberada' | 'impedida',
+        responsavel_atraso: responsavelAtraso as 'etm' | 'petrobras' | 'sem_atraso' | 'impedimento' | null,
+      };
+      
+      if (tipo === 'liberacao') {
+        updateData.atraso_etm = atrasoETM;
+        updateData.atraso_petrobras = atrasoPetrobras;
+      }
+
       const { error: updateError } = await supabase
         .from('pts')
-        .update({ 
-          status: newStatus as 'pendente' | 'solicitada' | 'chegada' | 'liberada' | 'impedida',
-          responsavel_atraso: responsavelAtraso as 'etm' | 'petrobras' | 'sem_atraso' | 'impedimento' | null,
-        })
+        .update(updateData)
         .eq('id', pt.id);
 
       if (updateError) throw updateError;
@@ -267,34 +352,43 @@ export default function PTDetail() {
     }
   }
 
-  async function calcularResponsavel(): Promise<string> {
-    // Get SLA config
-    const { data: slaConfig } = await supabase
-      .from('sla_config')
-      .select('hora_limite_solicitacao, hora_limite_liberacao')
-      .eq('ativo', true)
-      .maybeSingle();
-
-    const horaLimiteSolicitacao = slaConfig?.hora_limite_solicitacao || '07:30:00';
-    const horaLimiteLiberacao = slaConfig?.hora_limite_liberacao || '08:15:00';
-
-    // Find solicitacao event
-    const solicitacao = eventos.find(e => e.tipo_evento === 'solicitacao');
-    if (!solicitacao) return 'sem_atraso';
-
-    const horaSolicitacao = format(new Date(solicitacao.criado_em), 'HH:mm:ss');
-    const horaLiberacao = format(new Date(), 'HH:mm:ss');
-
-    // Check delay
-    if (horaSolicitacao > horaLimiteSolicitacao) {
-      return 'etm'; // ETM requested late
+  async function handleLiberarClick() {
+    // If there's a delay, show causa dialog first
+    const delays = calcularAtrasos();
+    if (delays.atrasoETM > 0 || delays.atrasoPetrobras > 0) {
+      setShowCausaAtrasoDialog(true);
+    } else {
+      await registrarEvento('liberacao');
     }
-    
-    if (horaLiberacao > horaLimiteLiberacao) {
-      return 'petrobras'; // Petrobras released late
+  }
+
+  async function handleSaveCausaAtraso() {
+    if (!causaAtraso.trim()) {
+      toast.error('A causa do atraso é obrigatória');
+      return;
     }
 
-    return 'sem_atraso';
+    if (!pt) return;
+
+    setActionLoading(true);
+    try {
+      // Save causa_atraso
+      const { error: causaError } = await supabase
+        .from('pts')
+        .update({ causa_atraso: causaAtraso })
+        .eq('id', pt.id);
+
+      if (causaError) throw causaError;
+
+      // Then register liberacao
+      await registrarEvento('liberacao');
+      setShowCausaAtrasoDialog(false);
+      setCausaAtraso('');
+    } catch (error) {
+      console.error('Error saving causa atraso:', error);
+      toast.error('Erro ao salvar causa do atraso');
+      setActionLoading(false);
+    }
   }
 
   async function generateQRCode() {
@@ -325,23 +419,13 @@ export default function PTDetail() {
 
   const hasEvent = (tipo: string) => eventos.some(e => e.tipo_evento === tipo);
   
-  // Fluxo correto:
-  // 1. Admin cria PT (pendente)
-  // 2. Encarregado solicita liberação (solicitada) 
-  // 3. Encarregado registra chegada (chegada)
-  // 4. Operador libera OU registra impedimento (liberada/impedida)
-  
-  // Encarregado: solicita liberação em PTs pendentes
   const canSolicitar = isEncarregado && pt?.status === 'pendente' && !hasEvent('solicitacao');
-  
-  // Apenas Encarregado: registra chegada do operador (após solicitar)
   const canChegada = isEncarregado && hasEvent('solicitacao') && !hasEvent('chegada');
-  
-  // Apenas Operador: libera a PT (somente após Encarregado confirmar chegada)
   const canLiberar = isOperador && hasEvent('chegada') && !hasEvent('liberacao') && !hasEvent('impedimento');
-  
-  // Apenas Operador: registra impedimento (somente após Encarregado confirmar chegada)
   const canImpedir = isOperador && hasEvent('chegada') && !hasEvent('liberacao') && !hasEvent('impedimento');
+
+  const hhImprodutivo = calcularHHImprodutivo();
+  const totalAtraso = (pt?.atraso_etm || 0) + (pt?.atraso_petrobras || 0);
 
   if (loading) {
     return (
@@ -399,7 +483,6 @@ export default function PTDetail() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
               <StatusBadge status={pt.status} />
-              {/* DelayBadge só visível para Admin */}
               {isAdmin && pt.responsavel_atraso && <DelayBadge responsavel={pt.responsavel_atraso} />}
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -415,14 +498,91 @@ export default function PTDetail() {
                 <User className="h-4 w-4" />
                 <span>{pt.profiles?.nome || 'N/A'}</span>
               </div>
-              {pt.equipe && (
-                <div className="text-muted-foreground">
-                  Equipe: {pt.equipe}
-                </div>
-              )}
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Users className="h-4 w-4" />
+                <span>Efetivo: {pt.efetivo_qtd || 1}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Encarregado Card */}
+        {(pt.encarregado_nome || pt.encarregado_matricula) && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Encarregado
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground text-xs">Nome</p>
+                  <p className="font-medium">{pt.encarregado_nome || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Matrícula</p>
+                  <p className="font-medium">{pt.encarregado_matricula || '-'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Descrição da Operação */}
+        {pt.descricao_operacao && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Descrição da Operação
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm whitespace-pre-wrap">{pt.descricao_operacao}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Atrasos Card - Admin only */}
+        {isAdmin && (pt.status === 'liberada' || pt.status === 'impedida') && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Atrasos e HH Improdutivo
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                <div>
+                  <p className="text-muted-foreground text-xs">Atraso ETM</p>
+                  <p className="font-medium">{pt.atraso_etm || 0} min</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Atraso Petrobras</p>
+                  <p className="font-medium">{pt.atraso_petrobras || 0} min</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">HH Improdutivo</p>
+                  <p className="font-bold text-destructive">{hhImprodutivo} min</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Qtd. Efetivo</p>
+                  <p className="font-medium">{pt.efetivo_qtd || 1}</p>
+                </div>
+              </div>
+              
+              {totalAtraso > 0 && (
+                <div className="border-t pt-3">
+                  <p className="text-muted-foreground text-xs mb-1">Causa do Atraso</p>
+                  <p className="text-sm">{pt.causa_atraso || <span className="text-muted-foreground italic">Não informada</span>}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Action buttons */}
         {(canSolicitar || canChegada || canLiberar || canImpedir) && (
@@ -458,7 +618,7 @@ export default function PTDetail() {
             {canLiberar && (
               <Button 
                 className="h-14 text-base font-semibold gradient-success"
-                onClick={() => registrarEvento('liberacao')}
+                onClick={handleLiberarClick}
                 disabled={actionLoading || geoLoading}
               >
                 {actionLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
@@ -501,17 +661,14 @@ export default function PTDetail() {
 
                   return (
                     <div key={evento.id} className="relative flex gap-4 pb-6">
-                      {/* Timeline line */}
                       {!isLast && (
                         <div className="timeline-line bg-border" style={{ top: '24px', height: 'calc(100% - 8px)' }} />
                       )}
                       
-                      {/* Timeline dot */}
                       <div className={`timeline-dot ${config.color} text-white flex items-center justify-center z-10`}>
                         {config.icon}
                       </div>
 
-                      {/* Content */}
                       <div className="flex-1 pt-0.5">
                         <div className="flex items-start justify-between">
                           <div>
@@ -528,7 +685,6 @@ export default function PTDetail() {
                           </div>
                         </div>
 
-                        {/* Event details */}
                         {evento.confirmacao_status === 'pendente' && (
                           <Badge variant="outline" className="mt-2 bg-warning/10 text-warning border-warning/30">
                             Pendente de confirmação
@@ -605,6 +761,41 @@ export default function PTDetail() {
               disabled={!selectedImpedimento || actionLoading}
             >
               {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Registrar Impedimento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Causa Atraso Dialog */}
+      <Dialog open={showCausaAtrasoDialog} onOpenChange={setShowCausaAtrasoDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Causa do Atraso</DialogTitle>
+            <DialogDescription>
+              Foi detectado atraso nesta PT. Informe a causa antes de liberar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="causa">Causa do Atraso *</Label>
+              <Textarea
+                id="causa"
+                placeholder="Descreva a causa do atraso..."
+                value={causaAtraso}
+                onChange={(e) => setCausaAtraso(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCausaAtrasoDialog(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveCausaAtraso}
+              disabled={!causaAtraso.trim() || actionLoading}
+            >
+              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Liberar PT'}
             </Button>
           </DialogFooter>
         </DialogContent>

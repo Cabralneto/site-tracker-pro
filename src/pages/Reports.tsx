@@ -31,7 +31,8 @@ import {
   BarChart3,
   Clock,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  Users
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -53,11 +54,19 @@ interface PTReport {
   responsavel_atraso: 'etm' | 'petrobras' | 'sem_atraso' | 'impedimento' | null;
   equipe: string | null;
   criado_em: string;
+  efetivo_qtd: number;
+  encarregado_nome: string | null;
+  encarregado_matricula: string | null;
+  descricao_operacao: string | null;
+  causa_atraso: string | null;
+  atraso_etm: number;
+  atraso_petrobras: number;
   frentes: { nome: string } | null;
   disciplinas: { nome: string } | null;
   hora_solicitacao?: string | null;
   hora_chegada?: string | null;
   hora_liberacao?: string | null;
+  hh_improdutivo?: number;
 }
 
 interface Frente {
@@ -77,6 +86,7 @@ interface ReportStats {
   atrasosETM: number;
   atrasosPetrobras: number;
   tempoMedioLiberacao: string;
+  totalHHImprodutivo: number;
 }
 
 export default function Reports() {
@@ -91,6 +101,7 @@ export default function Reports() {
     atrasosETM: 0,
     atrasosPetrobras: 0,
     tempoMedioLiberacao: '-',
+    totalHHImprodutivo: 0,
   });
   
   // Filters
@@ -142,6 +153,13 @@ export default function Reports() {
           equipe,
           criado_em,
           tempo_ate_liberacao,
+          efetivo_qtd,
+          encarregado_nome,
+          encarregado_matricula,
+          descricao_operacao,
+          causa_atraso,
+          atraso_etm,
+          atraso_petrobras,
           frentes (nome),
           disciplinas (nome)
         `)
@@ -174,18 +192,27 @@ export default function Reports() {
           .select('pt_id, tipo_evento, criado_em')
           .in('pt_id', ptIds);
 
-        // Map events to PTs
+        // Map events to PTs and calculate HH Improdutivo
         const ptsWithEvents: PTReport[] = data.map(pt => {
           const ptEventos = eventos?.filter(e => e.pt_id === pt.id) || [];
           const solicitacao = ptEventos.find(e => e.tipo_evento === 'solicitacao');
           const chegada = ptEventos.find(e => e.tipo_evento === 'chegada');
           const liberacao = ptEventos.find(e => e.tipo_evento === 'liberacao');
 
+          const atrasoETM = Number(pt.atraso_etm) || 0;
+          const atrasoPetrobras = Number(pt.atraso_petrobras) || 0;
+          const efetivoQtd = pt.efetivo_qtd || 1;
+          const hhImprodutivo = efetivoQtd * (atrasoETM + atrasoPetrobras);
+
           return {
             ...pt,
             hora_solicitacao: solicitacao?.criado_em || null,
             hora_chegada: chegada?.criado_em || null,
             hora_liberacao: liberacao?.criado_em || null,
+            efetivo_qtd: efetivoQtd,
+            atraso_etm: atrasoETM,
+            atraso_petrobras: atrasoPetrobras,
+            hh_improdutivo: hhImprodutivo,
           } as PTReport;
         });
 
@@ -196,6 +223,7 @@ export default function Reports() {
         const impedidas = data.filter(p => p.status === 'impedida').length;
         const atrasosETM = data.filter(p => p.responsavel_atraso === 'etm').length;
         const atrasosPetrobras = data.filter(p => p.responsavel_atraso === 'petrobras').length;
+        const totalHHImprodutivo = ptsWithEvents.reduce((acc, pt) => acc + (pt.hh_improdutivo || 0), 0);
         
         setStats({
           total: data.length,
@@ -204,6 +232,7 @@ export default function Reports() {
           atrasosETM,
           atrasosPetrobras,
           tempoMedioLiberacao: '-',
+          totalHHImprodutivo,
         });
       } else {
         setPTs([]);
@@ -214,6 +243,7 @@ export default function Reports() {
           atrasosETM: 0,
           atrasosPetrobras: 0,
           tempoMedioLiberacao: '-',
+          totalHHImprodutivo: 0,
         });
       }
     } catch (error) {
@@ -239,12 +269,19 @@ export default function Reports() {
       'Data Serviço': format(parseISO(pt.data_servico), 'dd/MM/yyyy'),
       'Frente': pt.frentes?.nome || '-',
       'Disciplina': pt.disciplinas?.nome || '-',
-      'Equipe': pt.equipe || '-',
+      'Encarregado': pt.encarregado_nome || '-',
+      'Matrícula': pt.encarregado_matricula || '-',
+      'Qtd. Efetivo': pt.efetivo_qtd || 1,
+      'Descrição Operação': pt.descricao_operacao || '-',
       'Hora Solicitação': formatEventTime(pt.hora_solicitacao),
       'Hora Chegada': formatEventTime(pt.hora_chegada),
       'Hora Liberação': formatEventTime(pt.hora_liberacao),
       'Status': pt.status,
       'Responsável Atraso': pt.responsavel_atraso || 'Sem atraso',
+      'Atraso ETM (min)': pt.atraso_etm || 0,
+      'Atraso Petrobras (min)': pt.atraso_petrobras || 0,
+      'HH Improdutivo (min)': pt.hh_improdutivo || 0,
+      'Causa Atraso': pt.causa_atraso || '-',
     }));
   }
 
@@ -285,7 +322,7 @@ export default function Reports() {
       );
       
       // Stats summary
-      doc.text(`Total: ${stats.total} | Liberadas: ${stats.liberadas} | Impedidas: ${stats.impedidas}`, 14, 36);
+      doc.text(`Total: ${stats.total} | Liberadas: ${stats.liberadas} | Impedidas: ${stats.impedidas} | HH Improdutivo Total: ${stats.totalHHImprodutivo} min`, 14, 36);
       
       // Table data
       const tableData = pts.map(pt => [
@@ -293,18 +330,20 @@ export default function Reports() {
         pt.tipo_pt.toUpperCase(),
         format(parseISO(pt.data_servico), 'dd/MM/yyyy'),
         pt.frentes?.nome || '-',
+        pt.encarregado_nome || '-',
+        pt.efetivo_qtd || 1,
         formatEventTime(pt.hora_solicitacao),
-        formatEventTime(pt.hora_chegada),
         formatEventTime(pt.hora_liberacao),
         pt.status,
-        pt.responsavel_atraso || '-',
+        pt.hh_improdutivo || 0,
+        (pt.causa_atraso || '-').substring(0, 30),
       ]);
 
       autoTable(doc, {
-        head: [['Número', 'Tipo', 'Data', 'Frente', 'Solicit.', 'Chegada', 'Liberação', 'Status', 'Resp.']],
+        head: [['Número', 'Tipo', 'Data', 'Frente', 'Encarregado', 'Efetivo', 'Solicit.', 'Liberação', 'Status', 'HH Improd.', 'Causa']],
         body: tableData,
         startY: 42,
-        styles: { fontSize: 7 },
+        styles: { fontSize: 6 },
         headStyles: { fillColor: [30, 64, 175] },
       });
 
@@ -453,7 +492,7 @@ export default function Reports() {
         </Card>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
@@ -499,6 +538,15 @@ export default function Reports() {
               <p className="text-2xl font-bold mt-1">{stats.impedidas}</p>
             </CardContent>
           </Card>
+          <Card className="bg-destructive/5 border-destructive/20">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-destructive" />
+                <span className="text-xs text-muted-foreground">HH Improd.</span>
+              </div>
+              <p className="text-2xl font-bold mt-1 text-destructive">{stats.totalHHImprodutivo} <span className="text-sm font-normal">min</span></p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Data Table */}
@@ -525,11 +573,13 @@ export default function Reports() {
                       <TableHead>Número</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Frente</TableHead>
+                      <TableHead>Encarregado</TableHead>
+                      <TableHead className="text-center">Efetivo</TableHead>
                       <TableHead className="text-center">Solicitação</TableHead>
-                      <TableHead className="text-center">Chegada</TableHead>
                       <TableHead className="text-center">Liberação</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Resp. Atraso</TableHead>
+                      <TableHead className="text-center">HH Improd.</TableHead>
+                      <TableHead>Causa Atraso</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -545,11 +595,19 @@ export default function Reports() {
                           {format(parseISO(pt.data_servico), 'dd/MM/yyyy')}
                         </TableCell>
                         <TableCell>{pt.frentes?.nome || '-'}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {pt.encarregado_nome || '-'}
+                            {pt.encarregado_matricula && (
+                              <span className="text-xs text-muted-foreground block">
+                                {pt.encarregado_matricula}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">{pt.efetivo_qtd || 1}</TableCell>
                         <TableCell className="text-center font-mono text-sm">
                           {formatEventTime(pt.hora_solicitacao)}
-                        </TableCell>
-                        <TableCell className="text-center font-mono text-sm">
-                          {formatEventTime(pt.hora_chegada)}
                         </TableCell>
                         <TableCell className="text-center font-mono text-sm">
                           {formatEventTime(pt.hora_liberacao)}
@@ -557,8 +615,17 @@ export default function Reports() {
                         <TableCell>
                           <StatusBadge status={pt.status} />
                         </TableCell>
-                        <TableCell>
-                          <DelayBadge responsavel={pt.responsavel_atraso} />
+                        <TableCell className="text-center">
+                          {(pt.hh_improdutivo || 0) > 0 ? (
+                            <span className="text-destructive font-semibold">{pt.hh_improdutivo}</span>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-[200px]">
+                          <span className="text-sm truncate block" title={pt.causa_atraso || ''}>
+                            {pt.causa_atraso || '-'}
+                          </span>
                         </TableCell>
                       </TableRow>
                     ))}
