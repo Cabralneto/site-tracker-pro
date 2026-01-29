@@ -67,9 +67,14 @@ interface PT {
   causa_atraso: string | null;
   atraso_etm: number;
   atraso_petrobras: number;
+  frente_ids: string[];
+  disciplina_ids: string[];
   frentes?: { id: string; nome: string } | null;
   disciplinas?: { id: string; nome: string } | null;
   profiles?: { nome: string } | null;
+  // Para exibição de múltiplos
+  frentesNomes?: string[];
+  disciplinasNomes?: string[];
 }
 
 interface Evento {
@@ -160,12 +165,39 @@ export default function PTDetail() {
         .eq('id', ptData.criado_por)
         .maybeSingle();
 
+      // Fetch names for multiple frentes/disciplinas
+      let frentesNomes: string[] = [];
+      let disciplinasNomes: string[] = [];
+
+      const frenteIds = ptData.frente_ids || (ptData.frente_id ? [ptData.frente_id] : []);
+      const disciplinaIds = ptData.disciplina_ids || (ptData.disciplina_id ? [ptData.disciplina_id] : []);
+
+      if (frenteIds.length > 0) {
+        const { data: frentesData } = await supabase
+          .from('frentes')
+          .select('nome')
+          .in('id', frenteIds);
+        frentesNomes = frentesData?.map(f => f.nome) || [];
+      }
+
+      if (disciplinaIds.length > 0) {
+        const { data: disciplinasData } = await supabase
+          .from('disciplinas')
+          .select('nome')
+          .in('id', disciplinaIds);
+        disciplinasNomes = disciplinasData?.map(d => d.nome) || [];
+      }
+
       setPT({
         ...ptData,
         profiles: creatorProfile,
         efetivo_qtd: ptData.efetivo_qtd || 1,
         atraso_etm: Number(ptData.atraso_etm) || 0,
         atraso_petrobras: Number(ptData.atraso_petrobras) || 0,
+        frente_ids: frenteIds,
+        disciplina_ids: disciplinaIds,
+        frentesNomes,
+        disciplinasNomes,
       } as unknown as PT);
 
       // Fetch events
@@ -463,7 +495,7 @@ export default function PTDetail() {
               <Badge variant="outline" className="uppercase">{pt.tipo_pt}</Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              {pt.frentes?.nome} • {pt.disciplinas?.nome}
+              {pt.frentesNomes?.join(', ') || pt.frentes?.nome || 'Sem frente'} • {pt.disciplinasNomes?.join(', ') || pt.disciplinas?.nome || 'Sem disciplina'}
             </p>
           </div>
           <Button variant="outline" size="icon" onClick={generateQRCode}>

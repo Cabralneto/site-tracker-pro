@@ -61,12 +61,16 @@ interface PTReport {
   causa_atraso: string | null;
   atraso_etm: number;
   atraso_petrobras: number;
+  frente_ids: string[];
+  disciplina_ids: string[];
   frentes: { nome: string } | null;
   disciplinas: { nome: string } | null;
   hora_solicitacao?: string | null;
   hora_chegada?: string | null;
   hora_liberacao?: string | null;
   hh_improdutivo?: number;
+  frentesNomes?: string[];
+  disciplinasNomes?: string[];
 }
 
 interface Frente {
@@ -160,6 +164,10 @@ export default function Reports() {
           causa_atraso,
           atraso_etm,
           atraso_petrobras,
+          frente_id,
+          disciplina_id,
+          frente_ids,
+          disciplina_ids,
           frentes (nome),
           disciplinas (nome)
         `)
@@ -174,10 +182,10 @@ export default function Reports() {
         query = query.eq('responsavel_atraso', responsavelFilter as 'etm' | 'petrobras' | 'sem_atraso' | 'impedimento');
       }
       if (frenteFilter !== 'all') {
-        query = query.eq('frente_id', frenteFilter);
+        query = query.contains('frente_ids', [frenteFilter]);
       }
       if (disciplinaFilter !== 'all') {
-        query = query.eq('disciplina_id', disciplinaFilter);
+        query = query.contains('disciplina_ids', [disciplinaFilter]);
       }
 
       const { data, error } = await query;
@@ -192,6 +200,37 @@ export default function Reports() {
           .select('pt_id, tipo_evento, criado_em')
           .in('pt_id', ptIds);
 
+        // Collect all unique frente and disciplina IDs
+        const allFrenteIds = new Set<string>();
+        const allDisciplinaIds = new Set<string>();
+        
+        data.forEach(pt => {
+          const fIds = (pt as any).frente_ids || ((pt as any).frente_id ? [(pt as any).frente_id] : []);
+          const dIds = (pt as any).disciplina_ids || ((pt as any).disciplina_id ? [(pt as any).disciplina_id] : []);
+          fIds.forEach((id: string) => allFrenteIds.add(id));
+          dIds.forEach((id: string) => allDisciplinaIds.add(id));
+        });
+
+        // Fetch names for frentes and disciplinas
+        const frenteNamesMap: Record<string, string> = {};
+        const disciplinaNamesMap: Record<string, string> = {};
+
+        if (allFrenteIds.size > 0) {
+          const { data: frentesData } = await supabase
+            .from('frentes')
+            .select('id, nome')
+            .in('id', Array.from(allFrenteIds));
+          frentesData?.forEach(f => { frenteNamesMap[f.id] = f.nome; });
+        }
+
+        if (allDisciplinaIds.size > 0) {
+          const { data: disciplinasData } = await supabase
+            .from('disciplinas')
+            .select('id, nome')
+            .in('id', Array.from(allDisciplinaIds));
+          disciplinasData?.forEach(d => { disciplinaNamesMap[d.id] = d.nome; });
+        }
+
         // Map events to PTs and calculate HH Improdutivo
         const ptsWithEvents: PTReport[] = data.map(pt => {
           const ptEventos = eventos?.filter(e => e.pt_id === pt.id) || [];
@@ -204,6 +243,12 @@ export default function Reports() {
           const efetivoQtd = pt.efetivo_qtd || 1;
           const hhImprodutivo = efetivoQtd * (atrasoETM + atrasoPetrobras);
 
+          const fIds = (pt as any).frente_ids || ((pt as any).frente_id ? [(pt as any).frente_id] : []);
+          const dIds = (pt as any).disciplina_ids || ((pt as any).disciplina_id ? [(pt as any).disciplina_id] : []);
+          
+          const frentesNomes = fIds.map((id: string) => frenteNamesMap[id]).filter(Boolean);
+          const disciplinasNomes = dIds.map((id: string) => disciplinaNamesMap[id]).filter(Boolean);
+
           return {
             ...pt,
             hora_solicitacao: solicitacao?.criado_em || null,
@@ -213,6 +258,10 @@ export default function Reports() {
             atraso_etm: atrasoETM,
             atraso_petrobras: atrasoPetrobras,
             hh_improdutivo: hhImprodutivo,
+            frente_ids: fIds,
+            disciplina_ids: dIds,
+            frentesNomes,
+            disciplinasNomes,
           } as PTReport;
         });
 
@@ -267,8 +316,8 @@ export default function Reports() {
       'Número PT': pt.numero_pt,
       'Tipo': pt.tipo_pt.toUpperCase(),
       'Data Serviço': format(parseISO(pt.data_servico), 'dd/MM/yyyy'),
-      'Frente': pt.frentes?.nome || '-',
-      'Disciplina': pt.disciplinas?.nome || '-',
+      'Frente(s)': pt.frentesNomes?.join(', ') || pt.frentes?.nome || '-',
+      'Disciplina(s)': pt.disciplinasNomes?.join(', ') || pt.disciplinas?.nome || '-',
       'Encarregado': pt.encarregado_nome || '-',
       'Matrícula': pt.encarregado_matricula || '-',
       'Qtd. Efetivo': pt.efetivo_qtd || 1,
@@ -595,7 +644,7 @@ export default function Reports() {
                         <TableCell>
                           {format(parseISO(pt.data_servico), 'dd/MM/yyyy')}
                         </TableCell>
-                        <TableCell>{pt.frentes?.nome || '-'}</TableCell>
+                        <TableCell>{pt.frentesNomes?.join(', ') || pt.frentes?.nome || '-'}</TableCell>
                         <TableCell>
                           <div className="text-sm">
                             {pt.encarregado_nome || '-'}
