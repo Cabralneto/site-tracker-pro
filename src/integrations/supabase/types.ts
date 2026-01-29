@@ -205,11 +205,13 @@ export type Database = {
           data_servico: string
           descricao_operacao: string | null
           disciplina_id: string | null
+          disciplina_ids: string[] | null
           efetivo_qtd: number
           encarregado_matricula: string | null
           encarregado_nome: string | null
           equipe: string | null
           frente_id: string | null
+          frente_ids: string[] | null
           id: string
           numero_pt: string
           responsavel_atraso:
@@ -230,11 +232,13 @@ export type Database = {
           data_servico?: string
           descricao_operacao?: string | null
           disciplina_id?: string | null
+          disciplina_ids?: string[] | null
           efetivo_qtd?: number
           encarregado_matricula?: string | null
           encarregado_nome?: string | null
           equipe?: string | null
           frente_id?: string | null
+          frente_ids?: string[] | null
           id?: string
           numero_pt: string
           responsavel_atraso?:
@@ -255,11 +259,13 @@ export type Database = {
           data_servico?: string
           descricao_operacao?: string | null
           disciplina_id?: string | null
+          disciplina_ids?: string[] | null
           efetivo_qtd?: number
           encarregado_matricula?: string | null
           encarregado_nome?: string | null
           equipe?: string | null
           frente_id?: string | null
+          frente_ids?: string[] | null
           id?: string
           numero_pt?: string
           responsavel_atraso?:

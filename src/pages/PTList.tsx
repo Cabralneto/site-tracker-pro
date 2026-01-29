@@ -32,8 +32,12 @@ interface PT {
   encarregado_matricula: string | null;
   efetivo_qtd: number;
   criado_em: string;
+  frente_ids?: string[];
+  disciplina_ids?: string[];
   frentes?: { id: string; nome: string } | null;
   disciplinas?: { id: string; nome: string } | null;
+  frentesNomes?: string[];
+  disciplinasNomes?: string[];
 }
 
 interface Frente {
@@ -99,6 +103,10 @@ export default function PTList() {
           encarregado_matricula,
           efetivo_qtd,
           criado_em,
+          frente_id,
+          disciplina_id,
+          frente_ids,
+          disciplina_ids,
           frentes (id, nome),
           disciplinas (id, nome)
         `)
@@ -110,11 +118,11 @@ export default function PTList() {
       }
 
       if (frenteFilter !== 'all') {
-        query = query.eq('frente_id', frenteFilter);
+        query = query.contains('frente_ids', [frenteFilter]);
       }
 
       if (disciplinaFilter !== 'all') {
-        query = query.eq('disciplina_id', disciplinaFilter);
+        query = query.contains('disciplina_ids', [disciplinaFilter]);
       }
 
       if (isAdmin && responsavelFilter !== 'all') {
@@ -124,7 +132,54 @@ export default function PTList() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setPTs(data as PT[]);
+
+      // Fetch names for frentes and disciplinas
+      if (data && data.length > 0) {
+        const allFrenteIds = new Set<string>();
+        const allDisciplinaIds = new Set<string>();
+        
+        data.forEach(pt => {
+          const fIds = (pt as any).frente_ids || ((pt as any).frente_id ? [(pt as any).frente_id] : []);
+          const dIds = (pt as any).disciplina_ids || ((pt as any).disciplina_id ? [(pt as any).disciplina_id] : []);
+          fIds.forEach((id: string) => allFrenteIds.add(id));
+          dIds.forEach((id: string) => allDisciplinaIds.add(id));
+        });
+
+        const frenteNamesMap: Record<string, string> = {};
+        const disciplinaNamesMap: Record<string, string> = {};
+
+        if (allFrenteIds.size > 0) {
+          const { data: frentesData } = await supabase
+            .from('frentes')
+            .select('id, nome')
+            .in('id', Array.from(allFrenteIds));
+          frentesData?.forEach(f => { frenteNamesMap[f.id] = f.nome; });
+        }
+
+        if (allDisciplinaIds.size > 0) {
+          const { data: disciplinasData } = await supabase
+            .from('disciplinas')
+            .select('id, nome')
+            .in('id', Array.from(allDisciplinaIds));
+          disciplinasData?.forEach(d => { disciplinaNamesMap[d.id] = d.nome; });
+        }
+
+        const ptsWithNames = data.map(pt => {
+          const fIds = (pt as any).frente_ids || ((pt as any).frente_id ? [(pt as any).frente_id] : []);
+          const dIds = (pt as any).disciplina_ids || ((pt as any).disciplina_id ? [(pt as any).disciplina_id] : []);
+          return {
+            ...pt,
+            frente_ids: fIds,
+            disciplina_ids: dIds,
+            frentesNomes: fIds.map((id: string) => frenteNamesMap[id]).filter(Boolean),
+            disciplinasNomes: dIds.map((id: string) => disciplinaNamesMap[id]).filter(Boolean),
+          };
+        });
+
+        setPTs(ptsWithNames as PT[]);
+      } else {
+        setPTs([]);
+      }
     } catch (error) {
       console.error('Error fetching PTs:', error);
     } finally {
@@ -325,7 +380,7 @@ export default function PTList() {
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {pt.frentes?.nome || 'Sem frente'} • {pt.disciplinas?.nome || 'Sem disciplina'}
+                        {pt.frentesNomes?.join(', ') || pt.frentes?.nome || 'Sem frente'} • {pt.disciplinasNomes?.join(', ') || pt.disciplinas?.nome || 'Sem disciplina'}
                       </p>
                       {pt.encarregado_nome && (
                         <p className="text-xs text-muted-foreground mt-1">

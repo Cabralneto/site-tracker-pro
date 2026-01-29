@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { z } from 'zod';
@@ -35,8 +36,8 @@ const ptSchema = z.object({
   numero_pt: z.string().min(1, 'Número da PT é obrigatório').max(50),
   tipo_pt: z.enum(['pt', 'ptt']),
   data_servico: z.string().min(1, 'Data é obrigatória'),
-  frente_id: z.string().min(1, 'Frente é obrigatória'),
-  disciplina_id: z.string().min(1, 'Disciplina é obrigatória'),
+  frente_ids: z.array(z.string()).min(1, 'Selecione ao menos uma Frente'),
+  disciplina_ids: z.array(z.string()).min(1, 'Selecione ao menos uma Disciplina'),
   encarregado_nome: z.string().min(1, 'Nome do Encarregado é obrigatório').max(200),
   encarregado_matricula: z.string().min(1, 'Matrícula do Encarregado é obrigatória').max(50),
   efetivo_qtd: z.number().int().min(1, 'Quantidade de efetivo deve ser no mínimo 1'),
@@ -55,8 +56,8 @@ export default function CreatePT() {
   const [numeroPT, setNumeroPT] = useState('');
   const [tipoPT, setTipoPT] = useState<'pt' | 'ptt'>('pt');
   const [dataServico, setDataServico] = useState(getTodayString());
-  const [frenteId, setFrenteId] = useState('');
-  const [disciplinaId, setDisciplinaId] = useState('');
+  const [frenteIds, setFrenteIds] = useState<string[]>([]);
+  const [disciplinaIds, setDisciplinaIds] = useState<string[]>([]);
   const [encarregadoNome, setEncarregadoNome] = useState('');
   const [encarregadoMatricula, setEncarregadoMatricula] = useState('');
   const [efetivoQtd, setEfetivoQtd] = useState<number>(1);
@@ -87,8 +88,8 @@ export default function CreatePT() {
         numero_pt: numeroPT,
         tipo_pt: tipoPT,
         data_servico: dataServico,
-        frente_id: frenteId,
-        disciplina_id: disciplinaId,
+        frente_ids: frenteIds,
+        disciplina_ids: disciplinaIds,
         encarregado_nome: encarregadoNome,
         encarregado_matricula: encarregadoMatricula,
         efetivo_qtd: efetivoQtd,
@@ -107,15 +108,17 @@ export default function CreatePT() {
         return;
       }
 
-      // Create PT
+      // Create PT with arrays and legacy single values (first item for backward compatibility)
       const { data: pt, error: ptError } = await supabase
         .from('pts')
         .insert({
           numero_pt: numeroPT,
           tipo_pt: tipoPT,
           data_servico: dataServico,
-          frente_id: frenteId,
-          disciplina_id: disciplinaId,
+          frente_id: frenteIds[0] || null, // Legacy: primeiro item
+          disciplina_id: disciplinaIds[0] || null, // Legacy: primeiro item
+          frente_ids: frenteIds,
+          disciplina_ids: disciplinaIds,
           encarregado_nome: encarregadoNome,
           encarregado_matricula: encarregadoMatricula,
           efetivo_qtd: efetivoQtd,
@@ -137,6 +140,9 @@ export default function CreatePT() {
       setLoading(false);
     }
   }
+
+  const frenteOptions = frentes.map(f => ({ value: f.id, label: f.nome }));
+  const disciplinaOptions = disciplinas.map(d => ({ value: d.id, label: d.nome }));
 
   if (!isAdmin) {
     return (
@@ -214,35 +220,29 @@ export default function CreatePT() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="frente">Frente de Serviço *</Label>
-                <Select value={frenteId} onValueChange={setFrenteId}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Selecione a frente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {frentes.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Frente(s) de Serviço *</Label>
+                <MultiSelect
+                  options={frenteOptions}
+                  selected={frenteIds}
+                  onChange={setFrenteIds}
+                  placeholder="Selecione uma ou mais frentes"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Você pode selecionar múltiplas frentes
+                </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="disciplina">Disciplina *</Label>
-                <Select value={disciplinaId} onValueChange={setDisciplinaId}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Selecione a disciplina" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {disciplinas.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Disciplina(s) *</Label>
+                <MultiSelect
+                  options={disciplinaOptions}
+                  selected={disciplinaIds}
+                  onChange={setDisciplinaIds}
+                  placeholder="Selecione uma ou mais disciplinas"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Você pode selecionar múltiplas disciplinas
+                </p>
               </div>
 
               {/* Encarregado Section */}
