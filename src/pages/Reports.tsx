@@ -576,6 +576,7 @@ export default function Reports() {
                       <TableHead>Encarregado</TableHead>
                       <TableHead className="text-center">Efetivo</TableHead>
                       <TableHead className="text-center">Solicitação</TableHead>
+                      <TableHead className="text-center">Chegada</TableHead>
                       <TableHead className="text-center">Liberação</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-center">HH Improd.</TableHead>
@@ -608,6 +609,9 @@ export default function Reports() {
                         <TableCell className="text-center">{pt.efetivo_qtd || 1}</TableCell>
                         <TableCell className="text-center font-mono text-sm">
                           {formatEventTime(pt.hora_solicitacao)}
+                        </TableCell>
+                        <TableCell className="text-center font-mono text-sm">
+                          {formatEventTime(pt.hora_chegada)}
                         </TableCell>
                         <TableCell className="text-center font-mono text-sm">
                           {formatEventTime(pt.hora_liberacao)}
