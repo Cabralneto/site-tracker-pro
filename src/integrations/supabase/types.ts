@@ -194,6 +194,21 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles_directory: {
+        Row: {
+          id: string
+          nome: string
+        }
+        Insert: {
+          id: string
+          nome: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       pts: {
         Row: {
           atraso_etm: number | null

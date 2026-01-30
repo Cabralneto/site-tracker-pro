@@ -160,7 +160,7 @@ export default function PTDetail() {
 
       // Fetch creator profile separately
       const { data: creatorProfile } = await supabase
-        .from('profiles')
+        .from('profiles_directory')
         .select('nome')
         .eq('id', ptData.criado_por)
         .maybeSingle();
@@ -216,7 +216,7 @@ export default function PTDetail() {
       const eventosWithProfiles = await Promise.all(
         (eventosData || []).map(async (evento) => {
           const { data: profile } = await supabase
-            .from('profiles')
+            .from('profiles_directory')
             .select('nome')
             .eq('id', evento.criado_por)
             .maybeSingle();
