@@ -616,6 +616,16 @@ export default function PTDetail() {
           </Card>
         )}
 
+        {/* Operator waiting message - when PT is solicitada but not yet chegada */}
+        {isOperador && pt.status === 'solicitada' && !hasEvent('chegada') && (
+          <Alert className="border-info bg-info/10">
+            <Clock className="h-4 w-4 text-info" />
+            <AlertDescription className="text-info font-medium">
+              Operador ETM solicitou PT. Aguardando confirmação de chegada do operador.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Action buttons */}
         {(canSolicitar || canChegada || canLiberar || canImpedir) && (
           <div className="grid grid-cols-2 gap-3">
