@@ -158,27 +158,25 @@ serve(async (req) => {
       );
     }
 
-    // Generate new invite link
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.generateLink({
-      type: "invite",
+    // Generate new link using "recovery" type since user already exists
+    // "invite" type fails for existing users, but "recovery" works and provides the same flow
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: "recovery",
       email: targetProfile.email,
-      options: {
-        data: { nome: targetProfile.nome },
-      },
     });
 
-    if (inviteError) {
-      console.error("Error generating invite link:", inviteError);
+    if (linkError) {
+      console.error("Error generating recovery link:", linkError);
       return new Response(
         JSON.stringify({ error: "Erro ao gerar novo link de convite" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const inviteLink = inviteData.properties?.action_link;
+    const inviteLink = linkData.properties?.action_link;
 
     if (!inviteLink) {
-      console.error("Missing invite link in response");
+      console.error("Missing link in response");
       return new Response(
         JSON.stringify({ error: "Erro ao gerar link de convite" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
