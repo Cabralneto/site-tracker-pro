@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          admin_id: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
       disciplinas: {
         Row: {
           ativo: boolean | null
@@ -170,26 +197,59 @@ export type Database = {
         }
         Relationships: []
       }
+      invite_rate_limits: {
+        Row: {
+          action_type: string
+          admin_id: string
+          created_at: string | null
+          id: string
+          target_user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          created_at?: string | null
+          id?: string
+          target_user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          created_at?: string | null
+          id?: string
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           ativo: boolean | null
           criado_em: string | null
           email: string
+          force_password_change: boolean | null
           id: string
+          invite_expires_at: string | null
+          invite_sent_at: string | null
           nome: string
         }
         Insert: {
           ativo?: boolean | null
           criado_em?: string | null
           email: string
+          force_password_change?: boolean | null
           id: string
+          invite_expires_at?: string | null
+          invite_sent_at?: string | null
           nome: string
         }
         Update: {
           ativo?: boolean | null
           criado_em?: string | null
           email?: string
+          force_password_change?: boolean | null
           id?: string
+          invite_expires_at?: string | null
+          invite_sent_at?: string | null
           nome?: string
         }
         Relationships: []

@@ -25,6 +25,17 @@ export default function Auth() {
   const [loginPassword, setLoginPassword] = useState('');
 
   useEffect(() => {
+    // Check if coming from invite link
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    const accessToken = hashParams.get('access_token');
+    
+    if (type === 'invite' && accessToken) {
+      // Redirect to set password page with the hash params intact
+      navigate('/definir-senha' + window.location.hash);
+      return;
+    }
+
     if (user && !authLoading) {
       navigate('/');
     }
@@ -125,6 +136,12 @@ export default function Auth() {
                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Entrar'}
               </Button>
             </form>
+
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="text-center text-sm text-muted-foreground">
+                Esqueceu sua senha? Entre em contato com o administrador.
+              </p>
+            </div>
           </CardContent>
 
           <div className="px-6 pb-6">

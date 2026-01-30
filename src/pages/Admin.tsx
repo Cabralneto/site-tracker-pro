@@ -57,7 +57,9 @@ import {
   Shield,
   UserX,
   UserCheck,
-  Key
+  Key,
+  Mail,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -69,6 +71,8 @@ interface UserWithRoles {
   email: string;
   ativo: boolean;
   roles: AppRole[];
+  force_password_change?: boolean;
+  invite_sent_at?: string;
 }
 
 interface Frente {
@@ -134,13 +138,15 @@ export default function Admin() {
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
   const [selectedRole, setSelectedRole] = useState<AppRole>('operador');
 
-  // Create user state
+  // Create user via invite state
   const [createUserDialogOpen, setCreateUserDialogOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserNome, setNewUserNome] = useState('');
   const [newUserRole, setNewUserRole] = useState<AppRole>('operador');
   const [creatingUser, setCreatingUser] = useState(false);
+
+  // Resend invite state
+  const [resendingInviteUserId, setResendingInviteUserId] = useState<string | null>(null);
   
   // Delete user state
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
@@ -275,14 +281,9 @@ export default function Admin() {
     }
   }
 
-  async function createUser() {
-    if (!newUserEmail || !newUserPassword || !newUserNome) {
-      toast.error('Preencha todos os campos obrigatórios');
-      return;
-    }
-
-    if (newUserPassword.length < 6) {
-      toast.error('A senha deve ter pelo menos 6 caracteres');
+  async function createUserInvite() {
+    if (!newUserEmail || !newUserNome) {
+      toast.error('Preencha nome e email');
       return;
     }
 
@@ -291,7 +292,7 @@ export default function Admin() {
       const { data: { session } } = await supabase.auth.getSession();
       
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user-invite`,
         {
           method: 'POST',
           headers: {
@@ -299,9 +300,7 @@ export default function Admin() {
             'Authorization': `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
-            action: 'create',
             email: newUserEmail,
-            password: newUserPassword,
             nome: newUserNome,
             role: newUserRole,
           }),
@@ -311,21 +310,53 @@ export default function Admin() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Erro ao criar usuário');
+        throw new Error(result.error || 'Erro ao criar convite');
       }
 
-      toast.success('Usuário criado com sucesso');
+      toast.success(`Convite enviado para ${newUserEmail}`);
       setCreateUserDialogOpen(false);
       setNewUserEmail('');
-      setNewUserPassword('');
       setNewUserNome('');
       setNewUserRole('operador');
       fetchUsers();
     } catch (error: any) {
-      console.error('Error creating user:', error);
-      toast.error(error.message || 'Erro ao criar usuário');
+      console.error('Error creating user invite:', error);
+      toast.error(error.message || 'Erro ao criar convite');
     } finally {
       setCreatingUser(false);
+    }
+  }
+
+  async function resendInvite(userId: string) {
+    setResendingInviteUserId(userId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-resend-invite`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ userId }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao reenviar convite');
+      }
+
+      toast.success('Convite reenviado com sucesso');
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error resending invite:', error);
+      toast.error(error.message || 'Erro ao reenviar convite');
+    } finally {
+      setResendingInviteUserId(null);
     }
   }
 
@@ -784,15 +815,6 @@ export default function Admin() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Senha *</Label>
-                        <Input 
-                          type="password"
-                          value={newUserPassword} 
-                          onChange={(e) => setNewUserPassword(e.target.value)}
-                          placeholder="Mínimo 6 caracteres"
-                        />
-                      </div>
-                      <div className="space-y-2">
                         <Label>Permissão Inicial</Label>
                         <Select value={newUserRole} onValueChange={(v: AppRole) => setNewUserRole(v)}>
                           <SelectTrigger>
@@ -806,14 +828,18 @@ export default function Admin() {
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
+                        <Mail className="h-4 w-4 inline mr-2" />
+                        Um email será enviado para o usuário definir sua própria senha.
+                      </div>
                     </div>
                     <DialogFooter>
                       <DialogClose asChild>
                         <Button variant="outline" disabled={creatingUser}>Cancelar</Button>
                       </DialogClose>
-                      <Button onClick={createUser} disabled={creatingUser}>
-                        {creatingUser ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserPlus className="h-4 w-4 mr-1" />}
-                        Criar Usuário
+                      <Button onClick={createUserInvite} disabled={creatingUser}>
+                        {creatingUser ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Mail className="h-4 w-4 mr-1" />}
+                        Enviar Convite
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -855,9 +881,22 @@ export default function Admin() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant={u.ativo ? 'default' : 'secondary'} className={u.ativo ? 'bg-success/20 text-success' : ''}>
-                                {u.ativo ? 'Ativo' : 'Inativo'}
-                              </Badge>
+                              {u.force_password_change ? (
+                                <div className="flex flex-col gap-1">
+                                  <Badge variant="outline" className="bg-warning/20 text-warning text-xs">
+                                    Aguardando senha
+                                  </Badge>
+                                  {u.invite_sent_at && (
+                                    <span className="text-xs text-muted-foreground">
+                                      Enviado em {new Date(u.invite_sent_at).toLocaleDateString('pt-BR')}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <Badge variant={u.ativo ? 'default' : 'secondary'} className={u.ativo ? 'bg-success/20 text-success' : ''}>
+                                  {u.ativo ? 'Ativo' : 'Inativo'}
+                                </Badge>
+                              )}
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1">
@@ -980,6 +1019,23 @@ export default function Admin() {
                                     </DialogFooter>
                                   </DialogContent>
                                 </Dialog>
+
+                                {/* Resend invite button - only for users awaiting password */}
+                                {u.force_password_change && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    onClick={() => resendInvite(u.id)}
+                                    title="Reenviar convite"
+                                    disabled={resendingInviteUserId === u.id}
+                                  >
+                                    {resendingInviteUserId === u.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
 
                                 <Button 
                                   variant="ghost" 
