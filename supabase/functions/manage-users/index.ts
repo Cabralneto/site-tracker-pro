@@ -35,7 +35,14 @@ interface ToggleActiveRequest {
   active: boolean;
 }
 
-type RequestBody = ListUsersRequest | CreateUserRequest | DeleteUserRequest | UpdatePasswordRequest | ToggleActiveRequest;
+interface UpdateUserRequest {
+  action: "update_user";
+  userId: string;
+  nome?: string;
+  email?: string;
+}
+
+type RequestBody = ListUsersRequest | CreateUserRequest | DeleteUserRequest | UpdatePasswordRequest | ToggleActiveRequest | UpdateUserRequest;
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -269,6 +276,59 @@ serve(async (req) => {
           JSON.stringify({ error: updateError.message }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } else if (body.action === "update_user") {
+      const { userId, nome, email } = body;
+
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: "userId is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!nome && !email) {
+        return new Response(
+          JSON.stringify({ error: "At least one field (nome or email) must be provided" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Update profile data
+      const profileUpdate: { nome?: string; email?: string } = {};
+      if (nome) profileUpdate.nome = nome;
+      if (email) profileUpdate.email = email;
+
+      const { error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .update(profileUpdate)
+        .eq("id", userId);
+
+      if (profileError) {
+        return new Response(
+          JSON.stringify({ error: profileError.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // If email changed, also update auth.users
+      if (email) {
+        const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+          userId,
+          { email }
+        );
+
+        if (authError) {
+          return new Response(
+            JSON.stringify({ error: authError.message }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
 
       return new Response(
