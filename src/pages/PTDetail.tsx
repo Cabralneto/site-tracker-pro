@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { transitionPTStatus, eventTypeToStatus } from '@/lib/pt-workflow';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { StatusBadge, DelayBadge } from '@/components/pt/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -294,7 +295,7 @@ export default function PTDetail() {
   async function registrarEvento(tipo: 'solicitacao' | 'chegada' | 'liberacao' | 'impedimento', options?: {
     impedimentoId?: string;
     detalheImpedimento?: string;
-    pendente?: boolean;
+    observacao?: string;
   }) {
     if (!user || !pt) return;
     
@@ -303,81 +304,29 @@ export default function PTDetail() {
       // Get geolocation
       const location = await getLocation();
       
-      // Create event
-      const { error: eventoError } = await supabase
-        .from('eventos')
-        .insert({
-          pt_id: pt.id,
-          tipo_evento: tipo,
-          criado_por: user.id,
-          lat: location?.lat || null,
-          lon: location?.lon || null,
-          accuracy: location?.accuracy || null,
-          ip: null,
-          user_agent: navigator.userAgent,
-          confirmacao_status: options?.pendente ? 'pendente' : 'confirmado',
-          impedimento_id: options?.impedimentoId || null,
-          detalhe_impedimento: options?.detalheImpedimento || null,
-        });
-
-      if (eventoError) throw eventoError;
-
-      // Update PT status
-      let newStatus: string = pt.status;
-      let responsavelAtraso: string | null = pt.responsavel_atraso;
-      let atrasoETM = 0;
-      let atrasoPetrobras = 0;
-
-      switch (tipo) {
-        case 'solicitacao':
-          newStatus = 'solicitada';
-          break;
-        case 'chegada':
-          newStatus = 'chegada';
-          break;
-        case 'liberacao':
-          newStatus = 'liberada';
-          // Calculate delays
-          const delays = calcularAtrasos();
-          atrasoETM = delays.atrasoETM;
-          atrasoPetrobras = delays.atrasoPetrobras;
-          
-          if (atrasoETM > 0) {
-            responsavelAtraso = 'etm';
-          } else if (atrasoPetrobras > 0) {
-            responsavelAtraso = 'petrobras';
-          } else {
-            responsavelAtraso = 'sem_atraso';
-          }
-          break;
-        case 'impedimento':
-          newStatus = 'impedida';
-          responsavelAtraso = 'impedimento';
-          break;
-      }
-
-      const updateData: any = { 
-        status: newStatus as 'pendente' | 'solicitada' | 'chegada' | 'liberada' | 'impedida',
-        responsavel_atraso: responsavelAtraso as 'etm' | 'petrobras' | 'sem_atraso' | 'impedimento' | null,
+      // Map event type to new status
+      const newStatus = eventTypeToStatus(tipo);
+      
+      // Build event payload
+      const payload = {
+        observacao: options?.observacao,
+        impedimento_id: options?.impedimentoId,
+        detalhe_impedimento: options?.detalheImpedimento,
+        lat: location?.lat,
+        lon: location?.lon,
+        accuracy: location?.accuracy,
+        user_agent: navigator.userAgent,
       };
       
-      if (tipo === 'liberacao') {
-        updateData.atraso_etm = atrasoETM;
-        updateData.atraso_petrobras = atrasoPetrobras;
-      }
-
-      const { error: updateError } = await supabase
-        .from('pts')
-        .update(updateData)
-        .eq('id', pt.id);
-
-      if (updateError) throw updateError;
+      // Call RPC for secure workflow transition
+      await transitionPTStatus(pt.id, newStatus, payload);
 
       toast.success(`${eventConfig[tipo].label} registrada com sucesso!`);
       fetchPTData();
     } catch (error) {
       console.error('Error registering event:', error);
-      toast.error('Erro ao registrar evento');
+      const message = error instanceof Error ? error.message : 'Erro ao registrar evento';
+      toast.error(message);
     } finally {
       setActionLoading(false);
       setShowImpedimentoDialog(false);
@@ -646,13 +595,13 @@ export default function PTDetail() {
             {canChegada && (
               <Button 
                 className="h-14 text-base font-semibold col-span-2 bg-warning text-warning-foreground hover:bg-warning/90"
-                onClick={() => registrarEvento('chegada', { pendente: !isOperador })}
+                onClick={() => registrarEvento('chegada')}
                 disabled={actionLoading || geoLoading}
               >
                 {actionLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
                   <>
                     <UserCheck className="h-5 w-5 mr-2" />
-                    {isOperador ? 'Confirmar Chegada' : 'Registrar Chegada (Pendente)'}
+                    Registrar Chegada
                   </>
                 )}
               </Button>
