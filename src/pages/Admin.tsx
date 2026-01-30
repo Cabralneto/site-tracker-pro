@@ -166,30 +166,33 @@ export default function Admin() {
   async function fetchUsers() {
     setLoadingUsers(true);
     try {
-      // Fetch all profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, nome, email, ativo')
-        .order('nome');
+      // Use edge function to fetch users (bypasses RLS, admin-only)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      if (!token) {
+        throw new Error('Não autenticado');
+      }
 
-      if (profilesError) throw profilesError;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ action: 'list' }),
+        }
+      );
 
-      // Fetch all roles
-      const { data: allRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao buscar usuários');
+      }
 
-      if (rolesError) throw rolesError;
-
-      // Merge profiles with roles
-      const usersWithRoles: UserWithRoles[] = (profiles || []).map(profile => ({
-        ...profile,
-        roles: (allRoles || [])
-          .filter(r => r.user_id === profile.id)
-          .map(r => r.role as AppRole),
-      }));
-
-      setUsers(usersWithRoles);
+      setUsers(result.users as UserWithRoles[]);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Erro ao carregar usuários');
@@ -234,18 +237,41 @@ export default function Admin() {
 
   async function toggleUserActive(userId: string, currentStatus: boolean) {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ ativo: !currentStatus })
-        .eq('id', userId);
+      // Use edge function to toggle user status (bypasses RLS, admin-only)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      if (!token) {
+        throw new Error('Não autenticado');
+      }
 
-      if (error) throw error;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ 
+            action: 'toggle_active',
+            userId,
+            active: !currentStatus,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao alterar status');
+      }
 
       toast.success(currentStatus ? 'Usuário desativado' : 'Usuário ativado');
       fetchUsers();
     } catch (error: any) {
       console.error('Error toggling user status:', error);
-      toast.error('Erro ao alterar status do usuário');
+      toast.error(error.message || 'Erro ao alterar status do usuário');
     }
   }
 
