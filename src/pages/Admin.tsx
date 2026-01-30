@@ -158,6 +158,13 @@ export default function Admin() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
+  // Edit user state
+  const [editUserDialogOpen, setEditUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserWithRoles | null>(null);
+  const [editUserNome, setEditUserNome] = useState('');
+  const [editUserEmail, setEditUserEmail] = useState('');
+  const [updatingUser, setUpdatingUser] = useState(false);
+
   useEffect(() => {
     if (isAdmin) {
       fetchUsers();
@@ -448,6 +455,55 @@ export default function Admin() {
       toast.error(error.message || 'Erro ao alterar senha');
     } finally {
       setChangingPassword(false);
+    }
+  }
+
+  async function updateUser() {
+    if (!editingUser) return;
+
+    if (!editUserNome.trim() && !editUserEmail.trim()) {
+      toast.error('Preencha pelo menos um campo');
+      return;
+    }
+
+    setUpdatingUser(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'update_user',
+            userId: editingUser.id,
+            nome: editUserNome.trim() || undefined,
+            email: editUserEmail.trim() || undefined,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao atualizar usuário');
+      }
+
+      toast.success('Usuário atualizado com sucesso');
+      setEditUserDialogOpen(false);
+      setEditingUser(null);
+      setEditUserNome('');
+      setEditUserEmail('');
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      toast.error(error.message || 'Erro ao atualizar usuário');
+    } finally {
+      setUpdatingUser(false);
     }
   }
 
@@ -900,9 +956,70 @@ export default function Admin() {
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1">
+                                {/* Edit user button */}
+                                <Dialog 
+                                  open={editUserDialogOpen && editingUser?.id === u.id} 
+                                  onOpenChange={(open) => {
+                                    setEditUserDialogOpen(open);
+                                    if (!open) {
+                                      setEditingUser(null);
+                                      setEditUserNome('');
+                                      setEditUserEmail('');
+                                    }
+                                  }}
+                                >
+                                  <DialogTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon"
+                                      title="Editar usuário"
+                                      onClick={() => {
+                                        setEditingUser(u);
+                                        setEditUserNome(u.nome);
+                                        setEditUserEmail(u.email);
+                                      }}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent>
+                                    <DialogHeader>
+                                      <DialogTitle>Editar Usuário</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                      <div className="space-y-2">
+                                        <Label>Nome</Label>
+                                        <Input 
+                                          value={editUserNome}
+                                          onChange={(e) => setEditUserNome(e.target.value)}
+                                          placeholder="Nome completo"
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label>Email</Label>
+                                        <Input 
+                                          type="email"
+                                          value={editUserEmail}
+                                          onChange={(e) => setEditUserEmail(e.target.value)}
+                                          placeholder="email@exemplo.com"
+                                        />
+                                      </div>
+                                    </div>
+                                    <DialogFooter>
+                                      <DialogClose asChild>
+                                        <Button variant="outline" disabled={updatingUser}>Cancelar</Button>
+                                      </DialogClose>
+                                      <Button onClick={updateUser} disabled={updatingUser}>
+                                        {updatingUser ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Pencil className="h-4 w-4 mr-1" />}
+                                        Salvar
+                                      </Button>
+                                    </DialogFooter>
+                                  </DialogContent>
+                                </Dialog>
+
                                 <Dialog>
                                   <DialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={() => setSelectedUser(u)}>
+                                    <Button variant="ghost" size="icon" onClick={() => setSelectedUser(u)} title="Gerenciar permissões">
                                       <Shield className="h-4 w-4" />
                                     </Button>
                                   </DialogTrigger>
