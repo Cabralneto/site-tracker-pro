@@ -39,6 +39,8 @@ import { ptBR } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { sanitizeExportData, getTruncationWarning, MAX_EXPORT_ROWS } from '@/lib/excel-utils';
+import { toast } from '@/hooks/use-toast';
 
 interface EventoInfo {
   tipo_evento: string;
@@ -337,7 +339,29 @@ export default function Reports() {
   async function exportToExcel() {
     setExporting(true);
     try {
-      const data = getExportData();
+      const rawData = getExportData();
+      
+      // Sanitize data to prevent Excel injection and enforce row limits
+      const { data, truncated, originalCount } = sanitizeExportData(rawData, MAX_EXPORT_ROWS);
+      
+      if (data.length === 0) {
+        toast({
+          title: 'Nenhum dado para exportar',
+          description: 'Aplique filtros diferentes para encontrar registros.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      // Show warning if data was truncated
+      if (truncated) {
+        toast({
+          title: 'Exportação parcial',
+          description: getTruncationWarning(originalCount, MAX_EXPORT_ROWS),
+          variant: 'destructive',
+        });
+      }
+      
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Relatório PTs');
@@ -347,8 +371,18 @@ export default function Reports() {
       worksheet['!cols'] = colWidths;
       
       XLSX.writeFile(workbook, `relatorio_pts_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      
+      toast({
+        title: 'Exportação concluída',
+        description: `${data.length.toLocaleString('pt-BR')} registros exportados com sucesso.`,
+      });
     } catch (error) {
       console.error('Error exporting to Excel:', error);
+      toast({
+        title: 'Erro na exportação',
+        description: 'Não foi possível gerar o arquivo Excel.',
+        variant: 'destructive',
+      });
     } finally {
       setExporting(false);
     }
