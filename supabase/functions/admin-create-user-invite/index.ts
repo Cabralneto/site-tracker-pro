@@ -222,39 +222,164 @@ serve(async (req) => {
       <html>
         <head>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background: #ffffff; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px; }
-            .button { display: inline-block; background: #3182ce; color: white !important; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: 600; margin: 20px 0; }
-            .footer { text-align: center; color: #718096; font-size: 12px; margin-top: 20px; }
-            .warning { background: #fef3cd; border: 1px solid #ffc107; padding: 12px; border-radius: 6px; margin-top: 20px; font-size: 14px; }
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+              line-height: 1.6; 
+              color: #1a202c; 
+              margin: 0;
+              padding: 0;
+              background-color: #f7fafc;
+            }
+            .wrapper {
+              background-color: #f7fafc;
+              padding: 40px 20px;
+            }
+            .container { 
+              max-width: 560px; 
+              margin: 0 auto; 
+              background: #ffffff;
+              border-radius: 12px;
+              overflow: hidden;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 20px rgba(0, 0, 0, 0.05);
+            }
+            .header { 
+              background: linear-gradient(135deg, #1a365d 0%, #2d4a7c 50%, #3182ce 100%); 
+              color: white; 
+              padding: 40px 30px; 
+              text-align: center; 
+            }
+            .logo-icon {
+              width: 64px;
+              height: 64px;
+              background: rgba(255, 255, 255, 0.15);
+              border-radius: 16px;
+              margin: 0 auto 16px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 28px;
+              font-weight: 700;
+              letter-spacing: -0.5px;
+            }
+            .header p {
+              margin: 8px 0 0 0;
+              opacity: 0.9;
+              font-size: 14px;
+            }
+            .content { 
+              padding: 40px 30px; 
+            }
+            .greeting {
+              font-size: 20px;
+              font-weight: 600;
+              color: #1a365d;
+              margin: 0 0 20px 0;
+            }
+            .message {
+              font-size: 16px;
+              color: #4a5568;
+              margin: 0 0 16px 0;
+            }
+            .button-container {
+              text-align: center;
+              margin: 32px 0;
+            }
+            .button { 
+              display: inline-block; 
+              background: linear-gradient(135deg, #3182ce 0%, #2c5282 100%); 
+              color: white !important; 
+              text-decoration: none; 
+              padding: 16px 40px; 
+              border-radius: 8px; 
+              font-weight: 600; 
+              font-size: 16px;
+              box-shadow: 0 4px 14px rgba(49, 130, 206, 0.4);
+              transition: transform 0.2s, box-shadow 0.2s;
+            }
+            .button:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 6px 20px rgba(49, 130, 206, 0.5);
+            }
+            .warning { 
+              background: linear-gradient(135deg, #fefcbf 0%, #fef3c7 100%); 
+              border-left: 4px solid #ecc94b;
+              padding: 16px 20px; 
+              border-radius: 0 8px 8px 0; 
+              margin: 24px 0;
+              font-size: 14px;
+              color: #744210;
+            }
+            .warning strong {
+              color: #975a16;
+            }
+            .divider {
+              height: 1px;
+              background: #e2e8f0;
+              margin: 24px 0;
+            }
+            .footer-note {
+              font-size: 13px;
+              color: #a0aec0;
+              margin: 0;
+            }
+            .footer { 
+              background: #f7fafc;
+              text-align: center; 
+              padding: 24px 30px;
+              border-top: 1px solid #e2e8f0;
+            }
+            .footer p {
+              margin: 4px 0;
+              font-size: 12px;
+              color: #718096;
+            }
+            .footer .brand {
+              font-weight: 600;
+              color: #4a5568;
+            }
           </style>
         </head>
         <body>
-          <div class="container">
-            <div class="header">
-              <h1 style="margin: 0; font-size: 24px;">PT Control</h1>
-              <p style="margin: 10px 0 0 0; opacity: 0.9;">Sistema de Controle de Permissões de Trabalho</p>
-            </div>
-            <div class="content">
-              <h2 style="margin-top: 0;">Olá, ${nome}!</h2>
-              <p>Você foi convidado para acessar o sistema PT Control.</p>
-              <p>Clique no botão abaixo para definir sua senha de acesso:</p>
-              <p style="text-align: center;">
-                <a href="${inviteLink}" class="button">Definir Minha Senha</a>
-              </p>
-              <div class="warning">
-                ⏰ <strong>Atenção:</strong> Este link é válido por 7 dias e só pode ser usado uma vez.
+          <div class="wrapper">
+            <div class="container">
+              <div class="header">
+                <div class="logo-icon">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 11l3 3L22 4"></path>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                  </svg>
+                </div>
+                <h1>PT Control</h1>
+                <p>Sistema de Controle de Permissões de Trabalho</p>
               </div>
-              <p style="margin-top: 20px; font-size: 14px; color: #718096;">
-                Se você não solicitou este acesso, ignore este e-mail.
-              </p>
-            </div>
-            <div class="footer">
-              <p>Equipe PT Control</p>
-              <p>Este é um e-mail automático, não responda.</p>
+              <div class="content">
+                <p class="greeting">Olá, ${nome}!</p>
+                <p class="message">
+                  Você foi convidado para acessar o sistema <strong>PT Control</strong>.
+                </p>
+                <p class="message">
+                  Para começar, você precisa definir sua senha de acesso. Clique no botão abaixo para criar sua senha:
+                </p>
+                <div class="button-container">
+                  <a href="${inviteLink}" class="button">Definir Minha Senha</a>
+                </div>
+                <div class="warning">
+                  ⏰ <strong>Atenção:</strong> Este link é válido por <strong>7 dias</strong> e só pode ser usado uma vez.
+                </div>
+                <div class="divider"></div>
+                <p class="footer-note">
+                  Se você não solicitou este acesso, ignore este e-mail com segurança.
+                </p>
+              </div>
+              <div class="footer">
+                <p class="brand">Equipe PT Control</p>
+                <p>Este é um e-mail automático, não responda.</p>
+              </div>
             </div>
           </div>
         </body>

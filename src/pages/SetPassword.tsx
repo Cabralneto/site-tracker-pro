@@ -58,13 +58,17 @@ export default function SetPassword() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session?.user) {
-          // No session - might need to handle the invite token
+          // No session - might need to handle the invite token from hash
           const hashParams = new URLSearchParams(window.location.hash.substring(1));
           const accessToken = hashParams.get('access_token');
           const refreshToken = hashParams.get('refresh_token');
           const type = hashParams.get('type');
           
-          if (accessToken && refreshToken && type === 'invite') {
+          // Accept various invite-related types: invite, signup, recovery, magiclink
+          const isInviteFlow = accessToken && refreshToken && 
+            (type === 'invite' || type === 'signup' || type === 'recovery' || type === 'magiclink');
+          
+          if (isInviteFlow) {
             // Set the session from the invite link
             const { data, error } = await supabase.auth.setSession({
               access_token: accessToken,
@@ -79,7 +83,20 @@ export default function SetPassword() {
             }
             
             if (data.user) {
-              setUserName(data.user.user_metadata?.nome || data.user.email || '');
+              // Check if this user needs to set password
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('nome, force_password_change')
+                .eq('id', data.user.id)
+                .maybeSingle();
+              
+              if (!profile?.force_password_change) {
+                // Password already set, redirect to home
+                navigate('/');
+                return;
+              }
+              
+              setUserName(profile?.nome || data.user.user_metadata?.nome || data.user.email || '');
             }
           } else {
             // No invite token, redirect to auth
