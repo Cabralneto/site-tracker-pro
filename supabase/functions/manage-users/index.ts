@@ -6,6 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface ListUsersRequest {
+  action: "list";
+}
+
 interface CreateUserRequest {
   action: "create";
   email: string;
@@ -25,7 +29,13 @@ interface UpdatePasswordRequest {
   newPassword: string;
 }
 
-type RequestBody = CreateUserRequest | DeleteUserRequest | UpdatePasswordRequest;
+interface ToggleActiveRequest {
+  action: "toggle_active";
+  userId: string;
+  active: boolean;
+}
+
+type RequestBody = ListUsersRequest | CreateUserRequest | DeleteUserRequest | UpdatePasswordRequest | ToggleActiveRequest;
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -82,7 +92,47 @@ serve(async (req) => {
 
     const body: RequestBody = await req.json();
 
-    if (body.action === "create") {
+    // LIST USERS - Returns all profiles with their roles (admin only)
+    if (body.action === "list") {
+      // Fetch all profiles using service role (bypasses RLS)
+      const { data: profiles, error: profilesError } = await supabaseAdmin
+        .from("profiles")
+        .select("id, nome, email, ativo")
+        .order("nome");
+
+      if (profilesError) {
+        return new Response(
+          JSON.stringify({ error: profilesError.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Fetch all roles
+      const { data: allRoles, error: rolesError } = await supabaseAdmin
+        .from("user_roles")
+        .select("user_id, role");
+
+      if (rolesError) {
+        return new Response(
+          JSON.stringify({ error: rolesError.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Merge profiles with roles
+      const usersWithRoles = (profiles || []).map(profile => ({
+        ...profile,
+        roles: (allRoles || [])
+          .filter(r => r.user_id === profile.id)
+          .map(r => r.role),
+      }));
+
+      return new Response(
+        JSON.stringify({ success: true, users: usersWithRoles }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+
+    } else if (body.action === "create") {
       const { email, password, nome, role } = body;
 
       if (!email || !password || !nome) {
@@ -177,6 +227,42 @@ serve(async (req) => {
         userId,
         { password: newPassword }
       );
+
+      if (updateError) {
+        return new Response(
+          JSON.stringify({ error: updateError.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+
+    } else if (body.action === "toggle_active") {
+      const { userId, active } = body;
+
+      if (!userId || typeof active !== "boolean") {
+        return new Response(
+          JSON.stringify({ error: "userId and active (boolean) are required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Prevent self-deactivation
+      if (userId === requestingUser.id && !active) {
+        return new Response(
+          JSON.stringify({ error: "Cannot deactivate your own account" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Update profile active status using service role (bypasses RLS)
+      const { error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update({ ativo: active })
+        .eq("id", userId);
 
       if (updateError) {
         return new Response(
