@@ -97,7 +97,7 @@ serve(async (req) => {
       // Fetch all profiles using service role (bypasses RLS)
       const { data: profiles, error: profilesError } = await supabaseAdmin
         .from("profiles")
-        .select("id, nome, email, ativo")
+        .select("id, nome, email, ativo, force_password_change, invite_sent_at")
         .order("nome");
 
       if (profilesError) {

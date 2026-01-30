@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 // Pages
 import Auth from "./pages/Auth";
+import SetPassword from "./pages/SetPassword";
 import Dashboard from "./pages/Dashboard";
 import PTList from "./pages/PTList";
 import CreatePT from "./pages/CreatePT";
@@ -28,6 +29,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/definir-senha" element={<SetPassword />} />
             <Route path="/" element={
               <ProtectedRoute>
                 <Dashboard />
