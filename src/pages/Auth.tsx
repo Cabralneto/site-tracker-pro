@@ -25,15 +25,22 @@ export default function Auth() {
   const [loginPassword, setLoginPassword] = useState('');
 
   useEffect(() => {
-    // Check if coming from invite link
+    // Check if coming from invite link (could be type=invite, signup, recovery, or magiclink)
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get('type');
     const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
     
-    if (type === 'invite' && accessToken) {
-      // Redirect to set password page with the hash params intact
-      navigate('/definir-senha' + window.location.hash);
-      return;
+    // If we have tokens in the hash, this might be an invite flow
+    if (accessToken && refreshToken) {
+      // Accept various types that Supabase might use for invite flows
+      const isInviteFlow = type === 'invite' || type === 'signup' || type === 'recovery' || type === 'magiclink';
+      
+      if (isInviteFlow) {
+        // Redirect to set password page with the hash params intact
+        navigate('/definir-senha' + window.location.hash);
+        return;
+      }
     }
 
     if (user && !authLoading) {
