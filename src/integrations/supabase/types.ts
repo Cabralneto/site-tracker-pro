@@ -374,6 +374,14 @@ export type Database = {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_encarregado_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_operador_or_admin: { Args: { _user_id: string }; Returns: boolean }
+      transition_pt_status: {
+        Args: {
+          _event_payload?: Json
+          _new_status: Database["public"]["Enums"]["pt_status"]
+          _pt_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "encarregado" | "operador" | "visualizador"
